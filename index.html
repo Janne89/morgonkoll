@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morgonkoll</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+<style>
+  :root {
+    --bg: #f4f2ee;
+    --kort: #ffffff;
+    --text: #1d1d1f;
+    --dampad: #6b6b70;
+    --linje: #e4e1db;
+    --accent: #c2562b;
+    --temp: #d9622b;
+    --regn: #3b82c4;
+    --markering: #fbeee6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141416;
+      --kort: #1e1e21;
+      --text: #ececee;
+      --dampad: #9a9aa2;
+      --linje: #2f2f34;
+      --accent: #f08a5d;
+      --temp: #f39a64;
+      --regn: #6aa9e0;
+      --markering: #3a2a22;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { margin-bottom: 20px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+  .datum { color: var(--dampad); margin-top: 2px; }
+  .rutnat { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .emoji, .nu .symbol, .dagar .symbol { font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+  @media (min-width: 820px) { .rutnat { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } .brett { grid-column: 1 / -1; } }
+  section.kort {
+    background: var(--kort);
+    border: 1px solid var(--linje);
+    border-radius: 14px;
+    padding: 18px 18px 14px;
+    min-width: 0;
+  }
+  h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dampad); }
+  .kalla { margin-top: 10px; font-size: 12px; color: var(--dampad); }
+  .kalla a { color: inherit; }
+  .fel { color: var(--accent); }
+
+  /* Väder */
+  .nu { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .nu .symbol { font-size: 44px; line-height: 1; }
+  .nu .grader { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; }
+  .nu .beskr { color: var(--dampad); font-size: 14px; }
+  svg.diagram { width: 100%; height: auto; display: block; overflow: visible; }
+  svg text { fill: var(--dampad); font-size: 11px; }
+  svg .tempetikett { fill: var(--text); font-size: 11.5px; font-weight: 600; }
+  .dagar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; border-top: 1px solid var(--linje); padding-top: 12px; text-align: center; }
+  .dagar .namn { font-size: 13px; color: var(--dampad); }
+  .dagar .symbol { font-size: 22px; }
+  .dagar .mm { font-size: 12px; color: var(--regn); min-height: 1em; }
+  .dagar .max { font-weight: 600; }
+  .dagar .min { color: var(--dampad); }
+
+  /* Lunch */
+  .restaurang { font-weight: 600; margin-bottom: 8px; }
+  .ratt { display: flex; gap: 12px; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--linje); }
+  .ratt:last-child { border-bottom: 0; }
+  .ratt.idag { background: var(--markering); margin: 0 -10px; padding: 8px 10px; border-radius: 8px; border-bottom: 0; }
+  .ratt .namn { font-weight: 600; }
+  .ratt .beskr { font-size: 14px; color: var(--dampad); }
+  .ratt .pris { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ratt .etikett { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-left: 6px; }
+  .rubrik { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dampad); margin: 14px 0 2px; }
+  .info { font-size: 13px; color: var(--dampad); margin-top: 10px; }
+  .kommer { color: var(--dampad); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Morgonkoll</h1>
+    <div class="datum" id="datum"></div>
+  </header>
+
+  <div class="rutnat">
+    <section class="kort" id="vader">
+      <h2>Väder · Stockholm</h2>
+      <div id="vader-innehall">Hämtar prognos…</div>
+      <div class="kalla">Källa: <a href="https://www.smhi.se/">SMHI</a> (CC BY 4.0)</div>
+    </section>
+
+    <section class="kort" id="lunch">
+      <h2>Lunch</h2>
+      <div id="lunch-innehall">Hämtar menyer…</div>
+    </section>
+
+    <section class="kort">
+      <h2>Nyheter</h2>
+      <div class="kommer">Kommer snart.</div>
+    </section>
+
+    <section class="kort">
+      <h2>Börs</h2>
+      <div class="kommer">Kommer snart.</div>
+    </section>
+  </div>
+</main>
+
+<script>
+// Publik nyckel – får ligga här. RLS gör att den bara kan läsa.
+const SUPABASE_URL = "https://axmmuhrvvjsgedetibiq.supabase.co";
+const SUPABASE_NYCKEL = "sb_publishable_WQdYYO7dKLnKQRzUWVarIQ_QEWiHivu";
+const SMHI = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/18.07/lat/59.33/data.json";
+
+const TIMMAR_I_DIAGRAM = 16;
+
+// --- Hjälpfunktioner ---
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Datum och timme i svensk tid oavsett var webbläsaren står.
+function lokal(tid) {
+  const delar = Object.fromEntries(new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", hourCycle: "h23", weekday: "long",
+  }).formatToParts(tid).map(p => [p.type, p.value]));
+  return { datum: `${delar.year}-${delar.month}-${delar.day}`, timme: +delar.hour, veckodag: delar.weekday };
+}
+
+function isoVecka(tid) {
+  const { datum } = lokal(tid);
+  const d = new Date(datum + "T12:00:00Z");
+  const dag = (d.getUTCDay() + 6) % 7;            // måndag = 0
+  d.setUTCDate(d.getUTCDate() - dag + 3);         // veckans torsdag avgör året
+  const ar = d.getUTCFullYear();
+  const vecka = Math.ceil(((d - Date.UTC(ar, 0, 1)) / 864e5 + 1) / 7);
+  return { ar, vecka };
+}
+
+// SMHI Wsymb2 (1–27) → emoji och text.
+const SYMBOLER = {
+  1: ["☀️", "Klart"], 2: ["🌤️", "Nästan klart"], 3: ["⛅", "Växlande molnighet"], 4: ["⛅", "Halvklart"],
+  5: ["🌥️", "Molnigt"], 6: ["☁️", "Mulet"], 7: ["🌫️", "Dimma"],
+  8: ["🌦️", "Lätta regnskurar"], 9: ["🌦️", "Regnskurar"], 10: ["🌧️", "Kraftiga regnskurar"], 11: ["⛈️", "Åskskurar"],
+  12: ["🌨️", "Lätta byar av snöblandat regn"], 13: ["🌨️", "Byar av snöblandat regn"], 14: ["🌨️", "Kraftiga byar av snöblandat regn"],
+  15: ["🌨️", "Lätta snöbyar"], 16: ["🌨️", "Snöbyar"], 17: ["🌨️", "Kraftiga snöbyar"],
+  18: ["🌧️", "Lätt regn"], 19: ["🌧️", "Regn"], 20: ["🌧️", "Kraftigt regn"], 21: ["⛈️", "Åska"],
+  22: ["🌨️", "Lätt snöblandat regn"], 23: ["🌨️", "Snöblandat regn"], 24: ["🌨️", "Kraftigt snöblandat regn"],
+  25: ["❄️", "Lätt snöfall"], 26: ["❄️", "Snöfall"], 27: ["❄️", "Kraftigt snöfall"],
+};
+function symbol(kod, timme) {
+  const [emoji, text] = SYMBOLER[kod] || ["·", ""];
+  const natt = timme < 6 || timme >= 20;
+  return [natt && kod <= 2 ? "🌙" : emoji, text];
+}
+
+// --- Väder ---
+
+async function visaVader() {
+  const ruta = document.getElementById("vader-innehall");
+  try {
+    const svar = await fetch(SMHI);
+    if (!svar.ok) throw new Error(`SMHI svarade ${svar.status}`);
+    const { timeSeries } = await svar.json();
+    const nu = Date.now() - 30 * 60e3;
+    const timmar = timeSeries
+      .map(t => ({ tid: new Date(t.time), ...t.data }))
+      .filter(t => t.tid >= nu);
+    if (!timmar.length) throw new Error("Tom prognos");
+
+    const forsta = timmar[0];
+    const [emoji, text] = symbol(forsta.symbol_code, lokal(forsta.tid).timme);
+    ruta.innerHTML = `
+      <div class="nu">
+        <div class="symbol">${emoji}</div>
+        <div>
+          <div class="grader">${Math.round(forsta.air_temperature)}°</div>
+          <div class="beskr">${esc(text)} · vind ${Math.round(forsta.wind_speed)} m/s</div>
+        </div>
+      </div>
+      ${diagram(timmar.slice(0, TIMMAR_I_DIAGRAM))}
+      ${dagsoversikt(timmar)}`;
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta vädret (${esc(e.message)}).</span>`;
+  }
+}
+
+function diagram(timmar) {
+  const B = 640, H = 210;
+  const topp = 40, tempBotten = 130, regnTopp = 142, regnBotten = 186;
+  const steg = B / timmar.length;
+  const x = i => steg * (i + 0.5);
+
+  const temps = timmar.map(t => t.air_temperature);
+  let lag = Math.min(...temps), hog = Math.max(...temps);
+  if (hog - lag < 4) { const mitt = (hog + lag) / 2; lag = mitt - 2; hog = mitt + 2; }
+  const y = v => tempBotten - (v - lag) / (hog - lag) * (tempBotten - topp - 14);
+
+  const maxRegn = Math.max(2, ...timmar.map(t => t.precipitation_amount_mean));
+  const regnH = mm => mm / maxRegn * (regnBotten - regnTopp);
+
+  const punkter = timmar.map((t, i) => [x(i), y(t.air_temperature)]);
+  const kurva = punkter.map(([px, py], i) => `${i ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+  const yta = `${kurva} L${punkter.at(-1)[0].toFixed(1)},${tempBotten} L${punkter[0][0].toFixed(1)},${tempBotten} Z`;
+
+  let delar = "";
+  timmar.forEach((t, i) => {
+    const timme = lokal(t.tid).timme;
+    const varannan = i % 2 === 0;
+    const mm = t.precipitation_amount_mean;
+    if (mm > 0) {
+      const h = Math.max(2, regnH(mm));
+      // Svagare stapel om sannolikheten är låg.
+      const opacitet = 0.35 + 0.65 * (t.probability_of_precipitation ?? 100) / 100;
+      delar += `<rect x="${(x(i) - steg * 0.32).toFixed(1)}" y="${(regnBotten - h).toFixed(1)}" width="${(steg * 0.64).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--regn)" opacity="${opacitet.toFixed(2)}"><title>${mm} mm, ${t.probability_of_precipitation}% risk</title></rect>`;
+    }
+    if (varannan) {
+      delar += `<text x="${x(i)}" y="22" text-anchor="middle" font-size="22" class="emoji" style="fill:initial">${symbol(t.symbol_code, timme)[0]}</text>`;
+      delar += `<text class="tempetikett" x="${x(i)}" y="${(y(t.air_temperature) - 8).toFixed(1)}" text-anchor="middle">${Math.round(t.air_temperature)}°</text>`;
+      delar += `<text x="${x(i)}" y="${regnBotten + 18}" text-anchor="middle">${String(timme).padStart(2, "0")}</text>`;
+    }
+    delar += `<circle cx="${x(i).toFixed(1)}" cy="${y(t.air_temperature).toFixed(1)}" r="${varannan ? 2.6 : 1.6}" fill="var(--temp)"/>`;
+  });
+
+  return `
+    <svg class="diagram" viewBox="0 0 ${B} ${H}" role="img" aria-label="Temperatur och nederbörd kommande ${timmar.length} timmar">
+      <defs><linearGradient id="tempyta" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--temp)" stop-opacity="0.22"/><stop offset="1" stop-color="var(--temp)" stop-opacity="0"/>
+      </linearGradient></defs>
+      <line x1="0" x2="${B}" y1="${regnBotten}" y2="${regnBotten}" stroke="var(--linje)"/>
+      <path d="${yta}" fill="url(#tempyta)"/>
+      <path d="${kurva}" fill="none" stroke="var(--temp)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+      ${delar}
+      <text x="${B}" y="${regnTopp - 2}" text-anchor="end">mm/h</text>
+    </svg>`;
+}
+
+function dagsoversikt(timmar) {
+  const perDag = new Map();
+  for (const t of timmar) {
+    const { datum, timme, veckodag } = lokal(t.tid);
+    if (!perDag.has(datum)) perDag.set(datum, { veckodag, timmar: [] });
+    perDag.get(datum).timmar.push({ ...t, timme });
+  }
+  const idag = lokal(new Date()).datum;
+  const dagar = [...perDag.entries()].filter(([d]) => d !== idag).slice(0, 5);
+  return `<div class="dagar">${dagar.map(([, { veckodag, timmar }]) => {
+    const temps = timmar.map(t => t.air_temperature);
+    const mm = timmar.reduce((s, t) => s + t.precipitation_amount_mean, 0);
+    // Symbolen mitt på dagen säger mest.
+    const mitt = timmar.reduce((a, b) => Math.abs(b.timme - 13) < Math.abs(a.timme - 13) ? b : a);
+    const [emoji, text] = symbol(mitt.symbol_code, 13);
+    return `<div title="${esc(text)}">
+      <div class="namn">${esc(veckodag.slice(0, 3))}</div>
+      <div class="symbol">${emoji}</div>
+      <div><span class="max">${Math.round(Math.max(...temps))}°</span> <span class="min">${Math.round(Math.min(...temps))}°</span></div>
+      <div class="mm">${mm >= 0.5 ? `${mm.toFixed(mm < 10 ? 1 : 0).replace(".", ",")} mm` : ""}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+// --- Lunch ---
+
+async function supabase(tabell, fraga) {
+  const svar = await fetch(`${SUPABASE_URL}/rest/v1/${tabell}?${fraga}`, { headers: { apikey: SUPABASE_NYCKEL } });
+  if (!svar.ok) throw new Error(`${tabell}: ${svar.status}`);
+  return svar.json();
+}
+
+async function visaLunch() {
+  const ruta = document.getElementById("lunch-innehall");
+  try {
+    const [ratter, info] = await Promise.all([
+      supabase("lunch", "select=*&order=ar.desc,vecka.desc,id.asc"),
+      supabase("lunch_info", "select=*"),
+    ]);
+    if (!ratter.length) { ruta.textContent = "Inga menyer hämtade än."; return; }
+
+    const { ar, vecka } = isoVecka(new Date());
+    const idag = lokal(new Date()).veckodag;
+    const vardag = !["lördag", "söndag"].includes(idag);
+
+    // Senaste veckan per restaurang.
+    const perRestaurang = new Map();
+    for (const r of ratter) {
+      const senaste = perRestaurang.get(r.restaurang);
+      if (!senaste) perRestaurang.set(r.restaurang, { ar: r.ar, vecka: r.vecka, ratter: [r] });
+      else if (senaste.ar === r.ar && senaste.vecka === r.vecka) senaste.ratter.push(r);
+    }
+
+    ruta.innerHTML = [...perRestaurang.entries()].map(([namn, m]) => {
+      const aktuell = m.ar === ar && m.vecka === vecka;
+      const extra = info.find(i => i.restaurang === namn && i.ar === m.ar && i.vecka === m.vecka);
+      const veckans = m.ratter.filter(r => r.sektion === "veckans");
+      // Vardag: dagens rätter först, andra dagars specialare sist.
+      const dagens = vardag && aktuell ? veckans.filter(r => !r.dag || r.dag === idag) : veckans;
+      const andraDagar = vardag && aktuell ? veckans.filter(r => r.dag && r.dag !== idag) : [];
+      const alltid = m.ratter.filter(r => r.sektion === "alltid");
+
+      const ratt = (r, markera) => `
+        <div class="ratt${markera ? " idag" : ""}">
+          <div>
+            <span class="namn">${esc(r.namn)}</span>${r.dag ? `<span class="etikett">${r.dag === idag && vardag ? "idag" : esc(r.dag)}</span>` : ""}
+            ${r.beskrivning ? `<div class="beskr">${esc(r.beskrivning)}</div>` : ""}
+          </div>
+          <div class="pris">${r.pris ? `${r.pris} kr` : ""}</div>
+        </div>`;
+
+      return `
+        <div class="restaurang">${esc(namn)}</div>
+        ${aktuell ? "" : `<div class="info fel">Visar vecka ${m.vecka} – veckans meny är inte hämtad än.</div>`}
+        <div class="rubrik">${vardag && aktuell ? `Idag, ${idag}` : `Vecka ${m.vecka}`}</div>
+        ${dagens.map(r => ratt(r, r.dag && r.dag === idag && vardag)).join("")}
+        ${andraDagar.length ? `<div class="rubrik">Andra dagar</div>${andraDagar.map(r => ratt(r)).join("")}` : ""}
+        ${alltid.length ? `<div class="rubrik">Alltid på menyn</div>${alltid.map(r => ratt(r)).join("")}` : ""}
+        ${extra?.info?.length ? `<div class="info">${extra.info.map(esc).join(" · ")}</div>` : ""}
+        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a></div>` : ""}`;
+    }).join("");
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta lunchmenyer (${esc(e.message)}).</span>`;
+  }
+}
+
+// --- Start ---
+
+const { vecka } = isoVecka(new Date());
+const datumText = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm", weekday: "long", day: "numeric", month: "long" });
+document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${datumText.slice(1)} · vecka ${vecka}`;
+
+visaVader();
+visaLunch();
+</script>
+</body>
+</html>

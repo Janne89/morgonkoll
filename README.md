@@ -7,7 +7,7 @@ Live (när den är publicerad): https://janne89.github.io/morgonkoll/
 ## Upplägg
 
 ```
-GitHub Pages (den här repon)       ← kollegorna öppnar sidan varje morgon
+GitHub Pages (den här repon)   
    ├─ Väder: hämtas direkt från SMHI i webbläsaren (sparas inte)
    └─ Lunch, nyheter, börs: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
@@ -58,5 +58,6 @@ GitHub Actions, vardagar flera gånger på morgonen
 3. ✅ [fetch/main.py](fetch/main.py) + [fetch/db.py](fetch/db.py) och
    [.github/workflows/hamta.yml](.github/workflows/hamta.yml) (vardagar 05:17–08:17 UTC + manuellt).
    Utan miljövariablerna blir `python fetch/main.py` en torrkörning som skriver ut menyn.
-4. Frontend: `index.html` med väderkort (SMHI) och lunchkort (dagens rätter först).
+4. ✅ Frontend: [index.html](index.html) med väderkort (SMHI: kurva, regnstaplar, 5 dagar) och
+   lunchkort (dagens rätter först). Kräver att GitHub Pages är på (Settings → Pages → main, /root).
 5. Bestäm källor för nyheter och börs.
