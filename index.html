@@ -179,7 +179,7 @@
     <section class="kort" id="bors">
       <h2>Börs &amp; valuta</h2>
       <div id="bors-innehall">Hämtar kurser…</div>
-      <div class="kalla">Index: Yahoo Finance (fördröjt) · Valuta: <a href="https://www.riksbank.se/">Riksbanken</a><span class="tid" id="bors-tid"></span></div>
+      <div class="kalla">Index, råvaror, bitcoin: Yahoo Finance (fördröjt) · Valuta: <a href="https://www.riksbank.se/">Riksbanken</a><span class="tid" id="bors-tid"></span></div>
     </section>
     </div>
   </div>
@@ -480,10 +480,13 @@ async function visaBors() {
     const rader = await supabase("bors", "select=*");
     visaTid("bors-tid", senaste(rader));
     if (!rader.length) { ruta.textContent = "Inga kurser hämtade än."; return; }
-    const ordning = ["^OMX", "^GSPC", "^IXIC", "^GDAXI", "SEKUSDPMI", "SEKEURPMI"];
+    const ordning = ["^OMX", "^GSPC", "^IXIC", "^GDAXI", "BZ=F", "GC=F", "BTC-USD", "SEKUSDPMI", "SEKEURPMI"];
+    // Enhet och antal decimaler för det som inte är index.
+    const visning = { "BZ=F": ["USD/fat", 2], "GC=F": ["USD/uns", 0], "BTC-USD": ["USD", 0], SEKUSDPMI: ["", 3], SEKEURPMI: ["", 3] };
     rader.sort((a, b) => ordning.indexOf(a.symbol) - ordning.indexOf(b.symbol));
     ruta.innerHTML = rader.map(r => {
       const p = Number(r.forandring_pct);
+      const [enhet, decimaler] = visning[r.symbol] || ["", 0];
       const klass = p > 0 ? "upp" : p < 0 ? "ned" : "";
       const pil = p > 0 ? "▲" : p < 0 ? "▼" : "";
       const datum = new Date(r.datum + "T12:00:00Z").toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
@@ -491,7 +494,7 @@ async function visaBors() {
         <div class="instrument" title="Senast ${esc(r.datum)} · ${esc(r.kalla)}">
           <div>
             <div class="namn">${esc(r.namn)}</div>
-            <div class="varde">${tal(r.varde, r.typ === "valuta" ? 3 : 0)} · ${datum}</div>
+            <div class="varde">${tal(r.varde, decimaler)}${enhet ? ` ${enhet}` : ""} · ${datum}</div>
           </div>
           ${minidiagram(r.historik, klass)}
           <div class="forandring ${klass}">${pil} ${tal(Math.abs(p), 2)} %</div>

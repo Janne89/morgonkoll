@@ -1,4 +1,4 @@
-"""Börsindex från Yahoo Finance och växelkurser från Riksbanken.
+"""Börsindex, råvaror och bitcoin från Yahoo Finance, växelkurser från Riksbanken.
 
 Yahoos chart-API är inofficiellt och kan sluta fungera. Därför hämtas varje
 instrument för sig, så att ett fel inte stoppar resten.
@@ -12,6 +12,9 @@ INDEX = [
     ("^GSPC", "S&P 500"),
     ("^IXIC", "Nasdaq"),
     ("^GDAXI", "DAX"),
+    ("BZ=F", "Olja (Brent)"),
+    ("GC=F", "Guld"),
+    ("BTC-USD", "Bitcoin"),
 ]
 VALUTOR = [
     ("SEKUSDPMI", "USD/SEK"),

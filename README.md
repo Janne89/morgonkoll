@@ -11,7 +11,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Väder | [SMHI](https://www.smhi.se/) öppna prognos-API | I webbläsaren | Varje gång sidan öppnas (SMHI gör ny prognos ungefär varje timme) |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
-| Börs: OMXS30, S&P 500, Nasdaq, DAX | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar, ca 06–22 |
+| Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
 | Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
@@ -31,7 +31,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 |---|---|---|
 | `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs) |
 | `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs |
-| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter |
+| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs |
 | manuellt (Run workflow) | – | allt |
 
 - GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
@@ -76,7 +76,7 @@ GitHub Actions (se schema ovan)
 
 ### Börs & valuta
 - Index via Yahoo Finance chart-API (`query1.finance.yahoo.com/v8/finance/chart/<symbol>`):
-  `^OMX` (OMXS30), `^GSPC`, `^IXIC`, `^GDAXI`. Inofficiellt – kan sluta fungera, och är formellt
+  `^OMX` (OMXS30), `^GSPC`, `^IXIC`, `^GDAXI`, `BZ=F` (Brent), `GC=F` (guld), `BTC-USD`. Inofficiellt – kan sluta fungera, och är formellt
   emot Yahoos villkor (avtalsfråga, inte olagligt). Fördröjda värden.
 - Valuta via Riksbankens öppna API (`api.riksbank.se/swea/v1`): `SEKUSDPMI`, `SEKEURPMI`.
 - En månads dagsvärden sparas för minidiagrammen.
@@ -101,5 +101,6 @@ GitHub Actions (se schema ovan)
 - **Nyhetsflöde:** en rad i `FLODEN` i [fetch/sources/nyheter.py](fetch/sources/nyheter.py).
   Filterknappen på sidan dyker upp av sig själv.
 - **Index:** en rad i `INDEX` i [fetch/sources/bors.py](fetch/sources/bors.py), och symbolen i
-  `ordning` i `visaBors()` i [index.html](index.html) för att bestämma plats.
+  `ordning` i `visaBors()` i [index.html](index.html) för att bestämma plats
+  (och i `visning` om den behöver enhet eller decimaler).
 - **Temadag:** en rad i `TEMADAGAR` i [index.html](index.html).
