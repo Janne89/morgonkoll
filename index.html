@@ -45,6 +45,9 @@
   header { margin-bottom: 20px; }
   h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
   .datum { color: var(--dampad); margin-top: 2px; }
+  .dagsinfo { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 14px; color: var(--dampad); }
+  .dagsinfo:empty { display: none; }
+  .dagsinfo .speciell { color: var(--accent); font-weight: 600; }
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
@@ -142,6 +145,7 @@
   <header>
     <h1>Morgonkoll</h1>
     <div class="datum" id="datum"></div>
+    <div class="dagsinfo" id="dagsinfo"></div>
   </header>
 
   <nav class="hopp" aria-label="Hoppa till">
@@ -498,12 +502,87 @@ async function visaBors() {
   }
 }
 
+// --- Dagen: namnsdag, helgdag, flaggdag och temadagar ---
+
+// Svenska dagar-API:et (öppet, tillåter anrop från webbläsaren).
+const DAGAR_API = "https://sholiday.faboul.se/dagar/v2.1/";
+
+// Temadagar som inte finns i API:et. Fyll gärna på – nyckeln är "MM-DD".
+const TEMADAGAR = {
+  "01-13": "Tjugondag Knut",
+  "02-14": "Alla hjärtans dag ❤️",
+  "03-08": "Internationella kvinnodagen",
+  "03-14": "Pi-dagen π",
+  "03-25": "Våffeldagen 🧇",
+  "04-01": "Första april 🤡",
+  "04-30": "Valborgsmässoafton 🔥",
+  "05-04": "Star Wars-dagen ✨",
+  "10-01": "Kaffets dag ☕",
+  "10-04": "Kanelbullens dag 🥐",
+  "10-31": "Halloween 🎃",
+  "11-07": "Kladdkakans dag 🍫",
+  "11-10": "Mårtensafton 🦢",
+  "12-09": "Pepparkakans dag 🍪",
+  "12-13": "Lucia 🕯️",
+};
+
+// Temadagar som flyttar sig från år till år.
+function rorligaTemadagar(ar) {
+  const d = (m, dag) => new Date(Date.UTC(ar, m - 1, dag));
+  const nyckel = t => t.toISOString().slice(5, 10);
+  const plus = (t, dagar) => new Date(t.getTime() + dagar * 864e5);
+  // n:te veckodagen i månaden (n = -1 → sista). veckodag: 0 = söndag.
+  const nte = (m, veckodag, n) => {
+    if (n > 0) { const f = d(m, 1); return plus(f, (veckodag - f.getUTCDay() + 7) % 7 + (n - 1) * 7); }
+    const s = d(m + 1, 0); return plus(s, -((s.getUTCDay() - veckodag + 7) % 7));
+  };
+  // Påskdagen (gregoriansk algoritm).
+  const a = ar % 19, b = Math.floor(ar / 100), c = ar % 100, e = Math.floor(b / 4), f = b % 4;
+  const g = Math.floor((b - Math.floor((b + 8) / 25) + 1) / 3), h = (19 * a + b - e - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * f + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const pask = d(Math.floor((h + l - 7 * m + 114) / 31), ((h + l - 7 * m + 114) % 31) + 1);
+  const forstaAdvent = plus(d(12, 25), -((d(12, 25).getUTCDay() || 7) + 21));
+
+  return {
+    [nyckel(plus(pask, -47))]: "Fettisdagen – semmeldags 🧁",
+    [nyckel(nte(5, 0, -1))]: "Mors dag 💐",
+    [nyckel(nte(8, 4, 3))]: "Surströmmingspremiär 🐟",
+    [nyckel(nte(11, 0, 2))]: "Fars dag",
+    [nyckel(plus(nte(11, 4, 4), 1))]: "Black Friday 🛍️",
+    [nyckel(forstaAdvent)]: "Första advent 🕯️",
+    [nyckel(plus(forstaAdvent, 7))]: "Andra advent 🕯️",
+    [nyckel(plus(forstaAdvent, 14))]: "Tredje advent 🕯️",
+    [nyckel(plus(forstaAdvent, 21))]: "Fjärde advent 🕯️",
+  };
+}
+
+async function visaDagen() {
+  const ruta = document.getElementById("dagsinfo");
+  const datum = lokal(new Date()).datum;
+  const [ar, man, dag] = datum.split("-");
+  const delar = [];
+
+  try {
+    const svar = await fetch(`${DAGAR_API}${ar}/${man}/${dag}`);
+    const info = (await svar.json()).dagar?.[0] || {};
+    if (info.helgdag) delar.push([info.helgdag, true]);
+    if (info.flaggdag) delar.push([`Flaggdag: ${info.flaggdag}`, false]);
+    if (info.namnsdag?.length) delar.unshift([`Namnsdag: ${info.namnsdag.join(", ")}`, false]);
+  } catch {}   // API:et nere – visa bara temadagarna
+
+  const tema = TEMADAGAR[`${man}-${dag}`] || rorligaTemadagar(+ar)[`${man}-${dag}`];
+  if (tema && !delar.some(([t]) => t.startsWith(tema.split(" ")[0]))) delar.push([tema, true]);
+
+  ruta.innerHTML = delar.map(([t, speciell]) => `<span${speciell ? ' class="speciell"' : ""}>${esc(t)}</span>`).join("");
+}
+
 // --- Start ---
 
 const { vecka } = isoVecka(new Date());
 const datumText = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Stockholm", weekday: "long", day: "numeric", month: "long" });
 document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${datumText.slice(1)} · vecka ${vecka}`;
 
+visaDagen();
 visaVader();
 visaLunch();
 visaNyheter();
