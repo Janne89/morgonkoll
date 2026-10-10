@@ -51,9 +51,9 @@ GitHub Actions, vardagar flera gånger på morgonen
 ### Börs – ❓ index/aktier ej bestämda
 
 ## Nästa steg
-1. Skapa Supabase-projektet `morgonkoll` och kör [supabase/tabeller.sql](supabase/tabeller.sql)
+1. ✅ Skapa Supabase-projektet `morgonkoll` och kör [supabase/tabeller.sql](supabase/tabeller.sql)
    i SQL Editor (tabellerna `lunch` och `lunch_info`, RLS: anon får bara läsa).
-2. Lägg `SUPABASE_URL` och `SUPABASE_SECRET_KEY` som GitHub Secrets och kör workflowet
+2. ✅ Lägg `SUPABASE_URL` och `SUPABASE_SECRET_KEY` som GitHub Secrets och kör workflowet
    "Hämta" manuellt i Actions-fliken för att se att det skriver.
 3. ✅ [fetch/main.py](fetch/main.py) + [fetch/db.py](fetch/db.py) och
    [.github/workflows/hamta.yml](.github/workflows/hamta.yml) (vardagar 05:17–08:17 UTC + manuellt).
