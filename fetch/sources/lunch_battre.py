@@ -3,6 +3,7 @@
 Sidan länkar alltid till veckans PDF ("Veckans meny"). När menyn byts får
 PDF:en en ny adress, så vi letar upp länken varje gång och tolkar texten.
 """
+import os
 import re
 import subprocess
 import tempfile
@@ -24,14 +25,16 @@ def hitta_pdf(html):
 
 
 def pdf_till_text(data):
-    # pdftotext (poppler) behåller både blocken och mellanslagen bäst.
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(data)
-        path = f.name
-    return subprocess.run(
-        ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
-        check=True, capture_output=True,
-    ).stdout.decode("utf-8")
+    # pdftotext (poppler) behåller både blocken och mellanslagen bäst. Det är ett
+    # kommandoradsprogram, inte ett Python-paket – det måste finnas installerat.
+    with tempfile.TemporaryDirectory() as mapp:
+        path = os.path.join(mapp, "meny.pdf")
+        with open(path, "wb") as f:
+            f.write(data)
+        return subprocess.run(
+            ["pdftotext", "-layout", "-enc", "UTF-8", path, "-"],
+            check=True, capture_output=True,
+        ).stdout.decode("utf-8")
 
 
 def pris(text):
