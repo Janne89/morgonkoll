@@ -1,7 +1,7 @@
 """Nyhetsrubriker från RSS-flöden. Vi sparar bara rubrik, ingress och länk."""
 import re
 import xml.etree.ElementTree as ET
-from datetime import timezone
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 
@@ -42,9 +42,11 @@ def tolka(kalla, xml):
 def hamta():
     headers = {"User-Agent": "Mozilla/5.0 (Morgonkoll)"}
     artiklar = {}
+    # Sätts på alla rader varje gång, så att sidan kan visa när vi senast hämtade.
+    hamtad = datetime.now(timezone.utc).isoformat()
     for kalla, url in FLODEN:
         svar = requests.get(url, headers=headers, timeout=30)
         svar.raise_for_status()
         for a in tolka(kalla, svar.content):
-            artiklar[a["lank"]] = a     # samma artikel kan ligga i flera flöden
+            artiklar[a["lank"]] = {**a, "hamtad": hamtad}     # samma artikel kan ligga i flera flöden
     return list(artiklar.values())

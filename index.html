@@ -79,6 +79,8 @@
   h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dampad); }
   .kalla { margin-top: 10px; font-size: 12px; color: var(--dampad); }
   .kalla a { color: inherit; }
+  .kalla .tid { opacity: 0.8; }
+  .kalla .tid:not(:empty)::before { content: " · "; }
   .fel { color: var(--accent); }
 
   /* Väder */
@@ -154,13 +156,13 @@
     <section class="kort" id="vader">
       <h2>Väder · Stockholm</h2>
       <div id="vader-innehall">Hämtar prognos…</div>
-      <div class="kalla">Källa: <a href="https://www.smhi.se/">SMHI</a> (CC BY 4.0)</div>
+      <div class="kalla">Källa: <a href="https://www.smhi.se/">SMHI</a> (CC BY 4.0)<span class="tid" id="vader-tid"></span></div>
     </section>
 
     <section class="kort" id="nyheter">
       <h2>Nyheter</h2>
       <div id="nyheter-innehall">Hämtar rubriker…</div>
-      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a></div>
+      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a><span class="tid" id="nyheter-tid"></span></div>
     </section>
     </div>
 
@@ -173,7 +175,7 @@
     <section class="kort" id="bors">
       <h2>Börs &amp; valuta</h2>
       <div id="bors-innehall">Hämtar kurser…</div>
-      <div class="kalla">Index: Yahoo Finance (fördröjt) · Valuta: <a href="https://www.riksbank.se/">Riksbanken</a></div>
+      <div class="kalla">Index: Yahoo Finance (fördröjt) · Valuta: <a href="https://www.riksbank.se/">Riksbanken</a><span class="tid" id="bors-tid"></span></div>
     </section>
     </div>
   </div>
@@ -227,6 +229,15 @@ function symbol(kod, timme) {
   return [natt && kod <= 2 ? "🌙" : emoji, text];
 }
 
+// Diskret "senast hämtad" i källraden på varje kort.
+const senaste = rader => rader.map(r => r.hamtad).filter(Boolean).sort().at(-1);
+function visaTid(id, iso, prefix = "") {
+  const el = document.getElementById(id);
+  if (!el || !iso) return;
+  el.textContent = `${prefix} ${tidText(iso)}`.trim();
+  el.title = `${prefix ? "Prognosen gjord" : "Senast hämtad"} ${new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}`;
+}
+
 // --- Väder ---
 
 async function visaVader() {
@@ -234,7 +245,8 @@ async function visaVader() {
   try {
     const svar = await fetch(SMHI);
     if (!svar.ok) throw new Error(`SMHI svarade ${svar.status}`);
-    const { timeSeries } = await svar.json();
+    const { timeSeries, createdTime } = await svar.json();
+    visaTid("vader-tid", createdTime, "prognos");
     const nu = Date.now() - 30 * 60e3;
     const timmar = timeSeries
       .map(t => ({ tid: new Date(t.time), ...t.data }))
@@ -394,7 +406,7 @@ async function visaLunch() {
           ${alltid.length ? `<div class="rubrik">Alltid på menyn</div>${alltid.map(r => ratt(r)).join("")}` : ""}
         </details>` : ""}
         ${extra?.info?.length ? `<div class="info">${extra.info.map(esc).join(" · ")}</div>` : ""}
-        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a></div>` : ""}
+        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a>${extra.hamtad ? `<span class="tid" title="Senast hämtad">${tidText(extra.hamtad)}</span>` : ""}</div>` : ""}
       </div>`;
     }).join("");
   } catch (e) {
@@ -416,7 +428,8 @@ function tidText(iso) {
 async function visaNyheter() {
   const ruta = document.getElementById("nyheter-innehall");
   try {
-    const artiklar = await supabase("nyheter", "select=kalla,rubrik,ingress,lank,publicerad&order=publicerad.desc&limit=80");
+    const artiklar = await supabase("nyheter", "select=kalla,rubrik,ingress,lank,publicerad,hamtad&order=publicerad.desc&limit=80");
+    visaTid("nyheter-tid", senaste(artiklar));
     if (!artiklar.length) { ruta.textContent = "Inga rubriker hämtade än."; return; }
     const kallor = ["Alla", ...new Set(artiklar.map(a => a.kalla))];
     let vald = "Alla";
@@ -461,6 +474,7 @@ async function visaBors() {
   const ruta = document.getElementById("bors-innehall");
   try {
     const rader = await supabase("bors", "select=*");
+    visaTid("bors-tid", senaste(rader));
     if (!rader.length) { ruta.textContent = "Inga kurser hämtade än."; return; }
     const ordning = ["^OMX", "^GSPC", "^IXIC", "^GDAXI", "SEKUSDPMI", "SEKEURPMI"];
     rader.sort((a, b) => ordning.indexOf(a.symbol) - ordning.indexOf(b.symbol));
