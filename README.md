@@ -1,75 +1,105 @@
 # Morgonkoll
 
-Daglig morgonöversikt för mig och kollegorna: lunchmenyer, väder, nyheter och börs på en sida.
+Daglig morgonöversikt för mig och kollegorna: väder, börs, nyheter, lunch och dagens namnsdag på en sida.
 
-Live (när den är publicerad): https://janne89.github.io/morgonkoll/
+Live: https://janne89.github.io/morgonkoll/
+
+## Källor i korthet
+
+| Kort | Källa | Hämtas | Uppdateras |
+|---|---|---|---|
+| Väder | [SMHI](https://www.smhi.se/) öppna prognos-API | I webbläsaren | Varje gång sidan öppnas (SMHI gör ny prognos ungefär varje timme) |
+| Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
+| Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
+| Börs: OMXS30, S&P 500, Nasdaq, DAX | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar, ca 06–22 |
+| Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
+| Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
+
+Varje kort visar diskret i källraden när datan senast hämtades. Står sidan öppen hämtar den
+väder, nyheter och börs på nytt var 15:e minut (bara när fliken syns).
+
+**Varför två vägar?** SMHI och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
+SVT, Di, Yahoo och Riksbanken gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
+av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
+
+## Schema (GitHub Actions)
+
+[.github/workflows/hamta.yml](.github/workflows/hamta.yml). Cron är i UTC – svensk tid är +1 (vinter) / +2 (sommar).
+
+| Cron (UTC) | Svensk tid (ca) | Kör |
+|---|---|---|
+| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs) |
+| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs |
+| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter |
+| manuellt (Run workflow) | – | allt |
+
+- GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
+- Två körningar körs aldrig samtidigt (`concurrency`).
+- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors]` – utan argument körs allt.
+  Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
+- Varje körning raderar data äldre än 7 dagar (för att hålla sig inom Supabase gratisnivå).
 
 ## Upplägg
 
 ```
-GitHub Pages (den här repon)   
-   ├─ Väder: hämtas direkt från SMHI i webbläsaren (sparas inte)
+GitHub Pages (index.html)
+   ├─ Väder (SMHI) och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
    └─ Lunch, nyheter, börs: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
-GitHub Actions: lunch vardagsmorgnar, nyheter + börs var 15:e min (vardagar), nyheter varje timme (helg)
-   └─ fetch/ (Python): hämtar källorna, skriver till Supabase med hemlig nyckel
-      och raderar data äldre än 7 dagar (för att hålla sig inom gratisnivån)
+GitHub Actions (se schema ovan)
+   └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
 ```
 
-### Beslut som är tagna
+### Beslut
 - **Hämtning:** GitHub Actions + Python (inte Supabase Edge Functions).
   Obs: GitHub stänger av schemalagda körningar efter 60 dagar utan commits – slå på igen i Actions-fliken.
-- **Supabase:** eget projekt `morgonkoll` (inte babatravels-projektet). Region Stockholm.
-  Security: Data API på, auto-expose av, automatic RLS på.
-- **Lagring:** max 7 dagars data per källa.
-- **Schema:** `python fetch/main.py [lunch] [nyheter] [bors]` – utan argument körs allt.
-  Workflowet väljer delar efter vilket cron-schema som triggade. Sidan laddar om nyheter,
-  börs och väder var 15:e minut om den står öppen.
+- **Supabase:** eget projekt `morgonkoll`, region Stockholm. Data API på, auto-expose av, automatic RLS på.
+  Tabeller och rättigheter: [supabase/tabeller.sql](supabase/tabeller.sql) (går att köra flera gånger).
 - **Hemligheter:** repot är publikt. Hemlig Supabase-nyckel bara som GitHub Secret
-  (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), aldrig i koden. Den publika nyckeln får ligga i frontend.
+  (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), aldrig i koden. Den publika nyckeln ligger i `index.html`.
 - **Stil i koden:** svenska namn och kommentarer.
 
-## Källor
+## Detaljer per källa
 
-### Lunch – Bättre Mat & Bar, Gärdet ✅ tolkare klar
-- Sida: https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet
-- Knappen "Veckans meny" länkar till en PDF (`/_files/ugd/<id>.pdf`) som får ny adress varje vecka.
-- PDF:en har riktig text. `pdftotext -layout` (poppler) ger bäst resultat – pypdf slår ihop ord.
-  I Actions: `sudo apt-get install -y poppler-utils`.
-- Menyn byts måndag morgon (senast `Last-Modified: mån 07:39`), så hämta flera gånger på morgonen.
-- [fetch/sources/lunch_battre.py](fetch/sources/lunch_battre.py) returnerar vecka, info och rätter
-  (sektion `veckans`/`alltid`, namn, beskrivning, pris, `dag` för dagsspecifika rätter som
-  "Raggmunk (endast tisdagar)"). Testad mot vecka 41 – alla 9 rätter tolkas rätt.
-- Fler restauranger kommer – en modul per restaurang i `fetch/sources/`.
-
-### Väder – SMHI ✅ API utrett
+### Väder – SMHI
 - `https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/18.07/lat/59.33/data.json`
-- Tillåter anrop från webbläsaren (CORS `*`), fri licens (CC BY 4.0 – ange SMHI som källa).
-  (Open-Meteo valdes bort: bara gratis för icke-kommersiellt bruk.)
-- Timvis: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
-  `wind_speed`, `symbol_code` (SMHI Wsymb2, 1–27: 1 klart … 6 mulet, 18–20 regn, 25–27 snö).
-- Önskemål: snygg, överskådlig bild över dagen (temperaturkurva, regnstaplar, symboler).
+- Licens CC BY 4.0 – SMHI anges som källa. (Open-Meteo valdes bort: bara gratis för icke-kommersiellt bruk.)
+- Timvärden: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
+  `wind_speed`, `symbol_code` (Wsymb2, 1–27). Kortet visar nuläge, 16 timmar framåt och 5 dagar.
 
-### Nyheter – SVT + Dagens industri ✅
+### Namnsdag och speciella dagar
+- `https://sholiday.faboul.se/dagar/v2.1/ÅÅÅÅ/MM/DD` ger namnsdag, helgdag och flaggdag.
+- Temadagar som inte finns i API:et ligger i `TEMADAGAR` (nyckel `"MM-DD"`) i [index.html](index.html).
+  Rörliga dagar (fettisdagen, mors/fars dag, surströmmingspremiären, Black Friday, advent)
+  räknas ut i `rorligaTemadagar()`.
+
+### Börs & valuta
+- Index via Yahoo Finance chart-API (`query1.finance.yahoo.com/v8/finance/chart/<symbol>`):
+  `^OMX` (OMXS30), `^GSPC`, `^IXIC`, `^GDAXI`. Inofficiellt – kan sluta fungera, och är formellt
+  emot Yahoos villkor (avtalsfråga, inte olagligt). Fördröjda värden.
+- Valuta via Riksbankens öppna API (`api.riksbank.se/swea/v1`): `SEKUSDPMI`, `SEKEURPMI`.
+- En månads dagsvärden sparas för minidiagrammen.
+- [fetch/sources/bors.py](fetch/sources/bors.py) → tabellen `bors` (en rad per instrument).
+  Varje instrument hämtas för sig, så ett fel stoppar inte resten.
+
+### Nyheter – SVT + Dagens industri
 - RSS: `svt.se/nyheter/inrikes/rss.xml`, `svt.se/nyheter/utrikes/rss.xml`, `di.se/rss`
   (SVT:s allmänna flöde är mest lokalt och sport). Bara rubrik, ingress och länk sparas.
 - [fetch/sources/nyheter.py](fetch/sources/nyheter.py) → tabellen `nyheter` (nyckel: länk).
 
-### Börs & valuta ✅
-- Index via Yahoo Finance chart-API (inofficiellt, kan sluta fungera – villkorsfråga, inte olagligt):
-  `^OMX` (OMXS30), `^GSPC`, `^IXIC`, `^GDAXI`. En månads dagsstängningar för minidiagram.
-- Valuta via Riksbankens öppna API (`api.riksbank.se/swea/v1`): `SEKUSDPMI`, `SEKEURPMI`.
-- [fetch/sources/bors.py](fetch/sources/bors.py) → tabellen `bors` (en rad per instrument, senaste läget).
+### Lunch – Bättre Mat & Bar, Gärdet
+- Knappen "Veckans meny" länkar till en PDF (`/_files/ugd/<id>.pdf`) som får ny adress varje vecka.
+- Menyn byts måndag morgon (senast `Last-Modified: mån 07:39`), därför flera hämtningar på morgonen.
+- `pdftotext -layout` (poppler) ger bäst resultat – pypdf slår ihop ord. Installeras bara i lunchkörningar.
+- [fetch/sources/lunch_battre.py](fetch/sources/lunch_battre.py) → tabellerna `lunch` (en rad per rätt)
+  och `lunch_info`. Veckans rader ersätts vid varje hämtning.
 
-## Nästa steg
-1. ✅ Skapa Supabase-projektet `morgonkoll` och kör [supabase/tabeller.sql](supabase/tabeller.sql)
-   i SQL Editor (tabellerna `lunch` och `lunch_info`, RLS: anon får bara läsa).
-2. ✅ Lägg `SUPABASE_URL` och `SUPABASE_SECRET_KEY` som GitHub Secrets och kör workflowet
-   "Hämta" manuellt i Actions-fliken för att se att det skriver.
-3. ✅ [fetch/main.py](fetch/main.py) + [fetch/db.py](fetch/db.py) och
-   [.github/workflows/hamta.yml](.github/workflows/hamta.yml) (vardagar 05:17–08:17 UTC + manuellt).
-   Utan miljövariablerna blir `python fetch/main.py` en torrkörning som skriver ut menyn.
-4. ✅ Frontend: [index.html](index.html) med väderkort (SMHI: kurva, regnstaplar, 5 dagar) och
-   lunchkort (dagens rätter först). Kräver att GitHub Pages är på (Settings → Pages → main, /root).
-5. ✅ Nyheter och börs. Kör om [supabase/tabeller.sql](supabase/tabeller.sql) (går att köra flera gånger)
-   för tabellerna `nyheter` och `bors`.
+## Lägga till en källa
+- **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
+  `lunch_battre.py`, och lägg till den i `LUNCHKALLOR` i [fetch/main.py](fetch/main.py).
+- **Nyhetsflöde:** en rad i `FLODEN` i [fetch/sources/nyheter.py](fetch/sources/nyheter.py).
+  Filterknappen på sidan dyker upp av sig själv.
+- **Index:** en rad i `INDEX` i [fetch/sources/bors.py](fetch/sources/bors.py), och symbolen i
+  `ordning` i `visaBors()` i [index.html](index.html) för att bestämma plats.
+- **Temadag:** en rad i `TEMADAGAR` i [index.html](index.html).
