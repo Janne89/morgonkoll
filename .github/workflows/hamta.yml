@@ -2,25 +2,44 @@ name: Hämta
 
 on:
   schedule:
-    # Vardagar 05:17–08:17 UTC (06–09 vintertid, 07–10 sommartid i Stockholm).
-    # Menyn byts måndag morgon, så vi hämtar flera gånger.
+    # Tider i UTC (Stockholm är +1 vintertid, +2 sommartid).
+    # Lunch + allt: vardagsmorgnar. Menyn byts måndag morgon, så vi hämtar flera gånger.
     - cron: "17 5-8 * * 1-5"
+    # Nyheter + börs: var 15:e minut på vardagar, ungefär 06–22 svensk tid (täcker USA-börsen).
+    - cron: "*/15 4-20 * * 1-5"
+    # Nyheter: en gång i timmen på helger.
+    - cron: "0 6-20 * * 0,6"
   workflow_dispatch:
+
+# Kör aldrig två hämtningar samtidigt.
+concurrency:
+  group: hamta
+  cancel-in-progress: false
 
 jobs:
   hamta:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Välj delar
+        id: delar
+        run: |
+          case "${{ github.event.schedule }}" in
+            "*/15 4-20 * * 1-5") echo "delar=nyheter bors" >> "$GITHUB_OUTPUT" ;;
+            "0 6-20 * * 0,6")    echo "delar=nyheter" >> "$GITHUB_OUTPUT" ;;
+            *)                   echo "delar=" >> "$GITHUB_OUTPUT" ;;  # lunchschemat och manuellt: allt
+          esac
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: fetch/requirements.txt
-      - run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      # Poppler behövs bara för lunch-PDF:en.
+      - if: steps.delar.outputs.delar == ''
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: pip install -r fetch/requirements.txt
-      - run: python fetch/main.py
+      - run: python fetch/main.py ${{ steps.delar.outputs.delar }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

@@ -494,6 +494,14 @@ visaVader();
 visaLunch();
 visaNyheter();
 visaBors();
+
+// Nyheter och börs hämtas var 15:e minut – uppdatera sidan i samma takt om den står öppen.
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  visaVader();
+  visaNyheter();
+  visaBors();
+}, 15 * 60e3);
 </script>
 </body>
 </html>

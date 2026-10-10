@@ -1,4 +1,7 @@
-"""Hämtar alla källor och skriver till Supabase.
+"""Hämtar källorna och skriver till Supabase.
+
+    python main.py                 # allt
+    python main.py nyheter bors    # bara vissa delar
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -58,14 +61,22 @@ def borsdata(db):
         raise RuntimeError("Börs: " + "; ".join(fel))
 
 
-def main():
+DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata}
+
+
+def main(namn):
+    okanda = set(namn) - DELAR.keys()
+    if okanda:
+        sys.exit(f"Okända delar: {', '.join(okanda)} (finns: {', '.join(DELAR)})")
+    delar = [DELAR[n] for n in namn] or list(DELAR.values())
+
     db = Databas.fran_miljo()
     if db is None:
         print("Torrkörning: SUPABASE_URL/SUPABASE_SECRET_KEY saknas, skriver inget.")
 
     # Varje del körs för sig så att ett fel inte stoppar resten.
     fel = 0
-    for del_ in (lunch, nyhetsrubriker, borsdata):
+    for del_ in delar:
         try:
             del_(db)
         except Exception:
@@ -79,4 +90,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

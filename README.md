@@ -11,7 +11,7 @@ GitHub Pages (den här repon)
    ├─ Väder: hämtas direkt från SMHI i webbläsaren (sparas inte)
    └─ Lunch, nyheter, börs: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
-GitHub Actions, vardagar flera gånger på morgonen
+GitHub Actions: lunch vardagsmorgnar, nyheter + börs var 15:e min (vardagar), nyheter varje timme (helg)
    └─ fetch/ (Python): hämtar källorna, skriver till Supabase med hemlig nyckel
       och raderar data äldre än 7 dagar (för att hålla sig inom gratisnivån)
 ```
@@ -22,6 +22,9 @@ GitHub Actions, vardagar flera gånger på morgonen
 - **Supabase:** eget projekt `morgonkoll` (inte babatravels-projektet). Region Stockholm.
   Security: Data API på, auto-expose av, automatic RLS på.
 - **Lagring:** max 7 dagars data per källa.
+- **Schema:** `python fetch/main.py [lunch] [nyheter] [bors]` – utan argument körs allt.
+  Workflowet väljer delar efter vilket cron-schema som triggade. Sidan laddar om nyheter,
+  börs och väder var 15:e minut om den står öppen.
 - **Hemligheter:** repot är publikt. Hemlig Supabase-nyckel bara som GitHub Secret
   (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), aldrig i koden. Den publika nyckeln får ligga i frontend.
 - **Stil i koden:** svenska namn och kommentarer.
