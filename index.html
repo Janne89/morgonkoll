@@ -47,12 +47,27 @@
   .datum { color: var(--dampad); margin-top: 2px; }
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
-  #vader { order: 1; } #lunch { order: 2; } #nyheter { order: 3; } #bors { order: 4; }
+  /* Mobil: kompakta kort först, lunchen sist. */
+  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #lunch { order: 4; }
+  section.kort { scroll-margin-top: 56px; }
+
+  /* Snabbmeny – bara på mobil. */
+  nav.hopp {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -16px 12px; padding: 8px 16px;
+    background: var(--bg);
+  }
+  nav.hopp a {
+    flex: none; font-size: 14px; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--linje); background: var(--kort); color: var(--text); text-decoration: none;
+  }
   .emoji, .nu .symbol, .dagar .symbol { font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
   @media (min-width: 820px) {
     .rutnat { flex-direction: row; align-items: flex-start; }
     .kolumn { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
     .kolumn.vanster { flex: 3; } .kolumn.hoger { flex: 2; }
+    nav.hopp { display: none; }
   }
   section.kort {
     background: var(--kort);
@@ -92,6 +107,11 @@
   .ratt .etikett { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-left: 6px; }
   .rubrik { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dampad); margin: 14px 0 2px; }
   .info { font-size: 13px; color: var(--dampad); margin-top: 10px; }
+  .restaurangblock + .restaurangblock { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--linje); }
+  details.hela summary { cursor: pointer; font-size: 14px; color: var(--accent); margin-top: 8px; list-style: none; }
+  details.hela summary::-webkit-details-marker { display: none; }
+  details.hela summary::before { content: "▸ "; }
+  details.hela[open] summary::before { content: "▾ "; }
 
   /* Nyheter */
   .nyhet { display: block; padding: 8px 0; border-bottom: 1px solid var(--linje); color: inherit; text-decoration: none; }
@@ -121,6 +141,13 @@
     <h1>Morgonkoll</h1>
     <div class="datum" id="datum"></div>
   </header>
+
+  <nav class="hopp" aria-label="Hoppa till">
+    <a href="#vader">Väder</a>
+    <a href="#bors">Börs</a>
+    <a href="#nyheter">Nyheter</a>
+    <a href="#lunch">Lunch</a>
+  </nav>
 
   <div class="rutnat">
     <div class="kolumn vanster">
@@ -325,6 +352,8 @@ async function visaLunch() {
     const { ar, vecka } = isoVecka(new Date());
     const idag = lokal(new Date()).veckodag;
     const vardag = !["lördag", "söndag"].includes(idag);
+    // På datorn får menyn plats utfälld, på mobilen visas bara dagens rätter.
+    const utfalld = matchMedia("(min-width: 820px)").matches;
 
     // Senaste veckan per restaurang.
     const perRestaurang = new Map();
@@ -338,10 +367,12 @@ async function visaLunch() {
       const aktuell = m.ar === ar && m.vecka === vecka;
       const extra = info.find(i => i.restaurang === namn && i.ar === m.ar && i.vecka === m.vecka);
       const veckans = m.ratter.filter(r => r.sektion === "veckans");
-      // Vardag: dagens rätter först, andra dagars specialare sist.
-      const dagens = vardag && aktuell ? veckans.filter(r => !r.dag || r.dag === idag) : veckans;
-      const andraDagar = vardag && aktuell ? veckans.filter(r => r.dag && r.dag !== idag) : [];
+      // Synligt: dagens rätter. Resten (andra dagars specialare, alltid på menyn) under "Hela menyn".
+      const visaIdag = vardag && aktuell;
+      const dagens = veckans.filter(r => !r.dag || (visaIdag && r.dag === idag));
+      const andraDagar = veckans.filter(r => r.dag && !(visaIdag && r.dag === idag));
       const alltid = m.ratter.filter(r => r.sektion === "alltid");
+      const ovriga = andraDagar.length + alltid.length;
 
       const ratt = (r, markera) => `
         <div class="ratt${markera ? " idag" : ""}">
@@ -352,15 +383,19 @@ async function visaLunch() {
           <div class="pris">${r.pris ? `${r.pris} kr` : ""}</div>
         </div>`;
 
-      return `
+      return `<div class="restaurangblock">
         <div class="restaurang">${esc(namn)}</div>
         ${aktuell ? "" : `<div class="info fel">Visar vecka ${m.vecka} – veckans meny är inte hämtad än.</div>`}
-        <div class="rubrik">${vardag && aktuell ? `Idag, ${idag}` : `Vecka ${m.vecka}`}</div>
-        ${dagens.map(r => ratt(r, r.dag && r.dag === idag && vardag)).join("")}
-        ${andraDagar.length ? `<div class="rubrik">Andra dagar</div>${andraDagar.map(r => ratt(r)).join("")}` : ""}
-        ${alltid.length ? `<div class="rubrik">Alltid på menyn</div>${alltid.map(r => ratt(r)).join("")}` : ""}
+        <div class="rubrik">${visaIdag ? `Idag, ${idag}` : `Vecka ${m.vecka}`}</div>
+        ${dagens.map(r => ratt(r, visaIdag && r.dag === idag)).join("")}
+        ${ovriga ? `<details class="hela"${utfalld ? " open" : ""}>
+          <summary>Hela menyn (${ovriga} rätter till)</summary>
+          ${andraDagar.length ? `<div class="rubrik">${visaIdag ? "Andra dagar" : "Vissa dagar"}</div>${andraDagar.map(r => ratt(r)).join("")}` : ""}
+          ${alltid.length ? `<div class="rubrik">Alltid på menyn</div>${alltid.map(r => ratt(r)).join("")}` : ""}
+        </details>` : ""}
         ${extra?.info?.length ? `<div class="info">${extra.info.map(esc).join(" · ")}</div>` : ""}
-        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a></div>` : ""}`;
+        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a></div>` : ""}
+      </div>`;
     }).join("");
   } catch (e) {
     ruta.innerHTML = `<span class="fel">Kunde inte hämta lunchmenyer (${esc(e.message)}).</span>`;
