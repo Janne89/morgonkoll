@@ -73,7 +73,12 @@ def tolka(text):
         elif forsta.startswith("lunchdryck"):
             info.append(rader[0])
             continue
-        if not rader or not sektion:
+        elif not sektion:
+            # Före första sektionen är allt info. Beroende på poppler-version kan
+            # "Sallad, bröd ... ingår" hamna i ett eget block efter rubriken.
+            info += rader
+            continue
+        if not rader:
             continue
 
         titel = rader[0]
