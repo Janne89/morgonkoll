@@ -9,7 +9,7 @@ import traceback
 from datetime import date
 
 from db import Databas
-from sources import lunch_battre
+from sources import bors, lunch_battre, nyheter
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -24,27 +24,53 @@ def ar_for_vecka(vecka, idag=None):
     return ar
 
 
+def lunch(db):
+    for kalla in LUNCHKALLOR:
+        meny = kalla.hamta()
+        if not meny["vecka"] or not meny["ratter"]:
+            raise RuntimeError(f"Tom eller otolkbar meny: {meny}")
+        ar = ar_for_vecka(meny["vecka"])
+        print(f"{meny['restaurang']}: vecka {meny['vecka']} {ar}, "
+              f"{len(meny['ratter'])} rätter")
+        if db:
+            db.ersatt_lunch(meny, ar)
+        else:
+            print(json.dumps(meny, ensure_ascii=False, indent=2))
+
+
+def nyhetsrubriker(db):
+    artiklar = nyheter.hamta()
+    print(f"Nyheter: {len(artiklar)} rubriker")
+    if db:
+        db.upsert("nyheter", artiklar, "lank")
+    else:
+        for a in sorted(artiklar, key=lambda a: a["publicerad"], reverse=True)[:10]:
+            print(f"  {a['kalla']:4} {a['publicerad'][:16]} {a['rubrik']}")
+
+
+def borsdata(db):
+    instrument, fel = bors.hamta()
+    for i in instrument:
+        print(f"  {i['namn']:8} {i['varde']:>10} {i['forandring_pct']:+.2f}% ({i['datum']})")
+    if db:
+        db.upsert("bors", instrument, "symbol")
+    if fel:
+        raise RuntimeError("Börs: " + "; ".join(fel))
+
+
 def main():
     db = Databas.fran_miljo()
     if db is None:
         print("Torrkörning: SUPABASE_URL/SUPABASE_SECRET_KEY saknas, skriver inget.")
 
+    # Varje del körs för sig så att ett fel inte stoppar resten.
     fel = 0
-    for kalla in LUNCHKALLOR:
+    for del_ in (lunch, nyhetsrubriker, borsdata):
         try:
-            meny = kalla.hamta()
-            if not meny["vecka"] or not meny["ratter"]:
-                raise RuntimeError(f"Tom eller otolkbar meny: {meny}")
-            ar = ar_for_vecka(meny["vecka"])
-            print(f"{meny['restaurang']}: vecka {meny['vecka']} {ar}, "
-                  f"{len(meny['ratter'])} rätter")
-            if db:
-                db.ersatt_lunch(meny, ar)
-            else:
-                print(json.dumps(meny, ensure_ascii=False, indent=2))
+            del_(db)
         except Exception:
             fel += 1
-            print(f"Fel i {kalla.__name__}:", file=sys.stderr)
+            print(f"Fel i {del_.__name__}:", file=sys.stderr)
             traceback.print_exc()
 
     if db:

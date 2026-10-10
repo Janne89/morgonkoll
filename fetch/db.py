@@ -49,16 +49,22 @@ class Databas:
         }
         self._anrop("DELETE", "lunch", params=filter)
         self._anrop("POST", "lunch", json=[{**gemensamt, **r} for r in meny["ratter"]])
-        self._anrop(
-            "POST", "lunch_info",
-            params={"on_conflict": "restaurang,ar,vecka"},
-            headers={"Prefer": "resolution=merge-duplicates"},
-            json=[{**gemensamt, "info": meny["info"],
-                   "hamtad": datetime.now(timezone.utc).isoformat()}],
-        )
+        self.upsert("lunch_info", [{**gemensamt, "info": meny["info"],
+                                    "hamtad": datetime.now(timezone.utc).isoformat()}],
+                    "restaurang,ar,vecka")
+
+    def upsert(self, tabell, rader, nyckel):
+        if rader:
+            self._anrop(
+                "POST", tabell,
+                params={"on_conflict": nyckel},
+                headers={"Prefer": "resolution=merge-duplicates"},
+                json=rader,
+            )
 
     def rensa_gammalt(self):
-        """Raderar allt som hämtades för mer än DAGAR_KVAR dagar sedan."""
+        """Raderar allt som är äldre än DAGAR_KVAR dagar."""
         grans = (datetime.now(timezone.utc) - timedelta(days=DAGAR_KVAR)).isoformat()
-        for tabell in ("lunch", "lunch_info"):
-            self._anrop("DELETE", tabell, params={"hamtad": f"lt.{grans}"})
+        for tabell, kolumn in (("lunch", "hamtad"), ("lunch_info", "hamtad"),
+                               ("nyheter", "publicerad"), ("bors", "hamtad")):
+            self._anrop("DELETE", tabell, params={kolumn: f"lt.{grans}"})

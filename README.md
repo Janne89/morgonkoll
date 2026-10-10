@@ -47,8 +47,16 @@ GitHub Actions, vardagar flera gånger på morgonen
   `wind_speed`, `symbol_code` (SMHI Wsymb2, 1–27: 1 klart … 6 mulet, 18–20 regn, 25–27 snö).
 - Önskemål: snygg, överskådlig bild över dagen (temperaturkurva, regnstaplar, symboler).
 
-### Nyheter – ❓ källor ej bestämda
-### Börs – ❓ index/aktier ej bestämda
+### Nyheter – SVT + Dagens industri ✅
+- RSS: `svt.se/nyheter/inrikes/rss.xml`, `svt.se/nyheter/utrikes/rss.xml`, `di.se/rss`
+  (SVT:s allmänna flöde är mest lokalt och sport). Bara rubrik, ingress och länk sparas.
+- [fetch/sources/nyheter.py](fetch/sources/nyheter.py) → tabellen `nyheter` (nyckel: länk).
+
+### Börs & valuta ✅
+- Index via Yahoo Finance chart-API (inofficiellt, kan sluta fungera – villkorsfråga, inte olagligt):
+  `^OMX` (OMXS30), `^GSPC`, `^IXIC`, `^GDAXI`. En månads dagsstängningar för minidiagram.
+- Valuta via Riksbankens öppna API (`api.riksbank.se/swea/v1`): `SEKUSDPMI`, `SEKEURPMI`.
+- [fetch/sources/bors.py](fetch/sources/bors.py) → tabellen `bors` (en rad per instrument, senaste läget).
 
 ## Nästa steg
 1. ✅ Skapa Supabase-projektet `morgonkoll` och kör [supabase/tabeller.sql](supabase/tabeller.sql)
@@ -60,4 +68,5 @@ GitHub Actions, vardagar flera gånger på morgonen
    Utan miljövariablerna blir `python fetch/main.py` en torrkörning som skriver ut menyn.
 4. ✅ Frontend: [index.html](index.html) med väderkort (SMHI: kurva, regnstaplar, 5 dagar) och
    lunchkort (dagens rätter först). Kräver att GitHub Pages är på (Settings → Pages → main, /root).
-5. Bestäm källor för nyheter och börs.
+5. ✅ Nyheter och börs. Kör om [supabase/tabeller.sql](supabase/tabeller.sql) (går att köra flera gånger)
+   för tabellerna `nyheter` och `bors`.
