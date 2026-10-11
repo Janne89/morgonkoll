@@ -38,6 +38,8 @@ create table if not exists nyheter (
   hamtad     timestamptz not null default now()
 );
 create index if not exists nyheter_publicerad on nyheter (publicerad desc);
+-- "nyheter" eller "ai" – AI-nyheterna visas under egen flik.
+alter table nyheter add column if not exists amne text not null default 'nyheter';
 
 -- Senaste läget per index/valuta, med en månads dagshistorik för minidiagram.
 create table if not exists bors (

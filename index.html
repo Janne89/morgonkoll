@@ -134,7 +134,9 @@
   .nyhet .kalla-etikett { font-weight: 600; color: var(--accent); margin-right: 6px; }
   .nyhet .rubriktext { font-weight: 600; }
   .nyhet .ingress { font-size: 14px; color: var(--dampad); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .flikar { display: flex; gap: 6px; margin: -4px 0 6px; }
+  .flikar { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 6px; }
+  .flikar + .flikar { margin-top: 2px; }
+  .flikar + .flikar button { font-size: 12px; padding: 2px 9px; }
   .flikar button { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linje); background: none; color: var(--dampad); cursor: pointer; }
   .flikar button[aria-pressed="true"] { background: var(--text); color: var(--kort); border-color: var(--text); }
 
@@ -210,7 +212,7 @@
     <section class="kort" id="nyheter">
       <h2>Nyheter</h2>
       <div id="nyheter-innehall">Hämtar rubriker…</div>
-      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a><span class="tid" id="nyheter-tid"></span></div>
+      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a> · AI: OpenAI, Anthropic, Google, TechCrunch, The Verge<span class="tid" id="nyheter-tid"></span></div>
     </section>
 
     <section class="kort" id="systembolaget">
@@ -477,6 +479,8 @@ async function visaLunch() {
 // --- Nyheter ---
 
 const ANTAL_NYHETER = 10;
+// Bolagen först, sedan media, i AI-flikens källrad.
+const AI_ORDNING = ["OpenAI", "Anthropic", "Google", "TechCrunch", "The Verge"];
 
 function tidText(iso) {
   const tid = new Date(iso);
@@ -488,27 +492,43 @@ function tidText(iso) {
 async function visaNyheter() {
   const ruta = document.getElementById("nyheter-innehall");
   try {
-    const artiklar = await supabase("nyheter", "select=kalla,rubrik,ingress,lank,publicerad,hamtad&order=publicerad.desc&limit=80");
+    const artiklar = await supabase("nyheter", "select=*&order=publicerad.desc&limit=250");
     visaTid("nyheter-tid", senaste(artiklar));
     if (!artiklar.length) { ruta.textContent = "Inga rubriker hämtade än."; return; }
-    const kallor = ["Alla", ...new Set(artiklar.map(a => a.kalla))];
-    let vald = "Alla";
-    try { vald = localStorage.getItem("nyhetskalla") || "Alla"; } catch {}
-    if (!kallor.includes(vald)) vald = "Alla";
+    // AI-nyheter ligger under egen flik (med en rad för källorna) och inte under "Alla".
+    const ai = a => a.amne === "ai";
+    const flikar = ["Alla", ...new Set(artiklar.filter(a => !ai(a)).map(a => a.kalla)), ...(artiklar.some(ai) ? ["AI"] : [])];
+    const aiKallor = ["Alla", ...[...new Set(artiklar.filter(ai).map(a => a.kalla))]
+      .sort((a, b) => (AI_ORDNING.indexOf(a) + 1 || 99) - (AI_ORDNING.indexOf(b) + 1 || 99))];
+    let vald = "Alla", valdAi = "Alla";
+    try { vald = localStorage.getItem("nyhetskalla") || "Alla"; valdAi = localStorage.getItem("aikalla") || "Alla"; } catch {}
+    if (!flikar.includes(vald)) vald = "Alla";
+    if (!aiKallor.includes(valdAi)) valdAi = "Alla";
+    const knappar = (lista, aktiv, attr) => `<div class="flikar">${lista.map(k => `<button type="button" ${attr}="${esc(k)}" aria-pressed="${k === aktiv}">${esc(k)}</button>`).join("")}</div>`;
 
     const rita = () => {
-      const urval = artiklar.filter(a => vald === "Alla" || a.kalla === vald).slice(0, ANTAL_NYHETER);
+      const urval = artiklar.filter(a =>
+        vald === "Alla" ? !ai(a) :
+        vald === "AI" ? ai(a) && (valdAi === "Alla" || a.kalla === valdAi) :
+        !ai(a) && a.kalla === vald
+      ).slice(0, ANTAL_NYHETER);
       ruta.innerHTML = `
-        <div class="flikar">${kallor.map(k => `<button type="button" data-kalla="${esc(k)}" aria-pressed="${k === vald}">${esc(k)}</button>`).join("")}</div>
+        ${knappar(flikar, vald, "data-kalla")}
+        ${vald === "AI" ? knappar(aiKallor, valdAi, "data-aikalla") : ""}
         ${urval.map((a, i) => `
           <a class="nyhet" href="${esc(a.lank)}" target="_blank" rel="noopener">
             <div class="meta"><span class="kalla-etikett">${esc(a.kalla)}</span>${tidText(a.publicerad)}</div>
             <div class="rubriktext">${esc(a.rubrik)}</div>
             ${i < 3 && a.ingress ? `<div class="ingress">${esc(a.ingress)}</div>` : ""}
           </a>`).join("")}`;
-      ruta.querySelectorAll(".flikar button").forEach(b => b.onclick = () => {
+      ruta.querySelectorAll("[data-kalla]").forEach(b => b.onclick = () => {
         vald = b.dataset.kalla;
         try { localStorage.setItem("nyhetskalla", vald); } catch {}
+        rita();
+      });
+      ruta.querySelectorAll("[data-aikalla]").forEach(b => b.onclick = () => {
+        valdAi = b.dataset.aikalla;
+        try { localStorage.setItem("aikalla", valdAi); } catch {}
         rita();
       });
     };

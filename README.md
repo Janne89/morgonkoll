@@ -14,7 +14,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
-| Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
@@ -95,7 +95,13 @@ GitHub Actions (se schema ovan)
 ### Nyheter – SVT + Dagens industri
 - RSS: `svt.se/nyheter/inrikes/rss.xml`, `svt.se/nyheter/utrikes/rss.xml`, `di.se/rss`
   (SVT:s allmänna flöde är mest lokalt och sport). Bara rubrik, ingress och länk sparas.
-- [fetch/sources/nyheter.py](fetch/sources/nyheter.py) → tabellen `nyheter` (nyckel: länk).
+- AI-fliken (kolumnen `amne = 'ai'`, visas inte under "Alla"):
+  - OpenAI: `openai.com/news/rss.xml`. Poster utan kategori (kundcase) hoppas över.
+  - Anthropic har inget eget flöde. Vi använder ett som skrapas av community-projektet
+    [Olshansk/rss-feeds](https://github.com/Olshansk/rss-feeds) – inofficiellt.
+  - Google (Gemini): `blog.google/technology/ai/rss/` och `deepmind.google/blog/rss.xml`.
+  - xAI (Grok), Meta och Mistral saknar flöden – deras nyheter fångas av TechCrunch AI och The Verge AI (Atom).
+- [fetch/sources/nyheter.py](fetch/sources/nyheter.py) → tabellen `nyheter` (nyckel: länk). Klarar RSS och Atom.
 
 ### Lunch – Bättre Mat & Bar, Gärdet
 - Knappen "Veckans meny" länkar till en PDF (`/_files/ugd/<id>.pdf`) som får ny adress varje vecka.
@@ -118,7 +124,7 @@ GitHub Actions (se schema ovan)
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
   `lunch_battre.py`, och lägg till den i `LUNCHKALLOR` i [fetch/main.py](fetch/main.py).
-- **Nyhetsflöde:** en rad i `FLODEN` i [fetch/sources/nyheter.py](fetch/sources/nyheter.py).
+- **Nyhetsflöde:** en rad i `FLODEN` i [fetch/sources/nyheter.py](fetch/sources/nyheter.py) med ämne `"nyheter"` eller `"ai"`.
   Filterknappen på sidan dyker upp av sig själv.
 - **Index:** en rad i `INDEX` i [fetch/sources/bors.py](fetch/sources/bors.py), och symbolen i
   `ordning` i `visaBors()` i [index.html](index.html) för att bestämma plats
