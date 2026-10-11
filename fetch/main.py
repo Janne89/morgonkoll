@@ -13,9 +13,9 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, evenemang, lunch_battre, nyheter, riksbanken, shl, systembolaget, trender
+from sources import bors, evenemang, lunch_airamen, lunch_battre, lunch_lulu, nyheter, riksbanken, shl, systembolaget, trender
 
-LUNCHKALLOR = [lunch_battre]
+LUNCHKALLOR = [lunch_battre, lunch_lulu, lunch_airamen]
 
 
 def ar_for_vecka(vecka, idag=None):
@@ -29,17 +29,24 @@ def ar_for_vecka(vecka, idag=None):
 
 
 def lunch(db):
+    # Varje restaurang för sig – en trasig meny ska inte stoppa de andra.
+    fel = []
     for kalla in LUNCHKALLOR:
-        meny = kalla.hamta()
-        if not meny["vecka"] or not meny["ratter"]:
-            raise RuntimeError(f"Tom eller otolkbar meny: {meny}")
-        ar = ar_for_vecka(meny["vecka"])
-        print(f"{meny['restaurang']}: vecka {meny['vecka']} {ar}, "
-              f"{len(meny['ratter'])} rätter")
-        if db:
-            db.ersatt_lunch(meny, ar)
-        else:
-            print(json.dumps(meny, ensure_ascii=False, indent=2))
+        try:
+            meny = kalla.hamta()
+            if not meny["vecka"] or not meny["ratter"]:
+                raise RuntimeError(f"Tom eller otolkbar meny: {meny}")
+            ar = ar_for_vecka(meny["vecka"])
+            print(f"{meny['restaurang']}: vecka {meny['vecka']} {ar}, "
+                  f"{len(meny['ratter'])} rätter")
+            if db:
+                db.ersatt_lunch(meny, ar)
+            else:
+                print(json.dumps(meny, ensure_ascii=False, indent=2)[:600])
+        except Exception as e:
+            fel.append(f"{kalla.__name__}: {e}")
+    if fel:
+        raise RuntimeError("Lunch: " + "; ".join(fel))
 
 
 def nyhetsrubriker(db):

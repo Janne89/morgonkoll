@@ -148,6 +148,9 @@
   .ratt .etikett { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-left: 6px; }
   .rubrik { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dampad); margin: 14px 0 2px; }
   .info { font-size: 13px; color: var(--dampad); margin-top: 10px; }
+  #lunch .lunchflikar { margin: -4px 0 10px; }
+  .lunchlank { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--linje); color: var(--dampad); text-decoration: none; }
+  .lunchlank:hover { color: var(--text); }
   .restaurangblock + .restaurangblock { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--linje); }
   details.hela summary { cursor: pointer; font-size: 14px; color: var(--accent); margin-top: 8px; list-style: none; }
   details.hela summary::-webkit-details-marker { display: none; }
@@ -814,6 +817,10 @@ async function supabase(tabell, fraga) {
   return svar.json();
 }
 
+// Flikar i lunchkortet: [restaurang i tabellen, kort namn]. Länkar = ställen vars meny inte går att hämta.
+const LUNCHSTALLEN = [["Bättre Mat & Bar", "Bättre Mat"], ["Lulu", "Lulu"], ["Ai Ramen Kita", "Ai Ramen"]];
+const LUNCHLANKAR = [["Zaap Thai", "https://www.facebook.com/ZaapThaiFood", "Veckomenyn läggs upp som bild på Facebook"]];
+
 async function visaLunch() {
   const ruta = document.getElementById("lunch-innehall");
   try {
@@ -823,7 +830,7 @@ async function visaLunch() {
     ]);
     if (!ratter.length) { ruta.textContent = "Inga menyer hämtade än."; return; }
 
-    const { ar, vecka } = isoVecka(new Date());
+    const { vecka } = isoVecka(new Date());
     const idag = lokal(new Date()).veckodag;
     const vardag = !["lördag", "söndag"].includes(idag);
     // På datorn får menyn plats utfälld, på mobilen visas bara dagens rätter.
@@ -836,29 +843,39 @@ async function visaLunch() {
       if (!senaste) perRestaurang.set(r.restaurang, { ar: r.ar, vecka: r.vecka, ratter: [r] });
       else if (senaste.ar === r.ar && senaste.vecka === r.vecka) senaste.ratter.push(r);
     }
+    const stallen = [...LUNCHSTALLEN.filter(([n]) => perRestaurang.has(n)),
+      ...[...perRestaurang.keys()].filter(n => !LUNCHSTALLEN.some(([k]) => k === n)).map(n => [n, n])];
+    let vald = stallen[0][0];
+    try { const s = localStorage.getItem("lunchstalle"); if (stallen.some(([n]) => n === s)) vald = s; } catch {}
 
-    ruta.innerHTML = [...perRestaurang.entries()].map(([namn, m]) => {
-      const aktuell = m.ar === ar && m.vecka === vecka;
+    const ratt = (r, markera) => `
+      <div class="ratt${markera ? " idag" : ""}">
+        <div>
+          <span class="namn">${esc(r.namn)}</span>${r.dag ? `<span class="etikett">${r.dag === idag && vardag ? "idag" : esc(r.dag)}</span>` : ""}
+          ${r.beskrivning ? `<div class="beskr">${esc(r.beskrivning)}</div>` : ""}
+        </div>
+        <div class="pris">${r.pris ? `${r.pris} kr` : ""}</div>
+      </div>`;
+    const lanktext = url => /\.pdf(\?|$)/i.test(url) ? "Meny som PDF" : /\.(png|jpe?g|webp)(\?|$)/i.test(url) ? "Menybild" : "Menyn på webben";
+
+    const block = namn => {
+      const m = perRestaurang.get(namn);
       const extra = info.find(i => i.restaurang === namn && i.ar === m.ar && i.vecka === m.vecka);
       const veckans = m.ratter.filter(r => r.sektion === "veckans");
+      const alltid = m.ratter.filter(r => r.sektion === "alltid");
+      // Fast meny (Lulu, Ai Ramen): visa rätterna direkt.
+      if (!veckans.length) {
+        return `${alltid.map(r => ratt(r)).join("")}
+          ${extra?.info?.length ? `<div class="info">${extra.info.map(esc).join(" · ")}</div>` : ""}
+          ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}" target="_blank" rel="noopener">${lanktext(extra.kalla)}</a> · fast lunchmeny${extra.hamtad ? `<span class="tid" title="Senast hämtad">${tidText(extra.hamtad)}</span>` : ""}</div>` : ""}`;
+      }
+      const aktuell = m.vecka === vecka;
       // Synligt: dagens rätter. Resten (andra dagars specialare, alltid på menyn) under "Hela menyn".
       const visaIdag = vardag && aktuell;
       const dagens = veckans.filter(r => !r.dag || (visaIdag && r.dag === idag));
       const andraDagar = veckans.filter(r => r.dag && !(visaIdag && r.dag === idag));
-      const alltid = m.ratter.filter(r => r.sektion === "alltid");
       const ovriga = andraDagar.length + alltid.length;
-
-      const ratt = (r, markera) => `
-        <div class="ratt${markera ? " idag" : ""}">
-          <div>
-            <span class="namn">${esc(r.namn)}</span>${r.dag ? `<span class="etikett">${r.dag === idag && vardag ? "idag" : esc(r.dag)}</span>` : ""}
-            ${r.beskrivning ? `<div class="beskr">${esc(r.beskrivning)}</div>` : ""}
-          </div>
-          <div class="pris">${r.pris ? `${r.pris} kr` : ""}</div>
-        </div>`;
-
-      return `<div class="restaurangblock">
-        <div class="restaurang">${esc(namn)}</div>
+      return `
         ${aktuell ? "" : `<div class="info fel">Visar vecka ${m.vecka} – veckans meny är inte hämtad än.</div>`}
         <div class="rubrik">${visaIdag ? `Idag, ${idag}` : `Vecka ${m.vecka}`}</div>
         ${dagens.map(r => ratt(r, visaIdag && r.dag === idag)).join("")}
@@ -868,9 +885,24 @@ async function visaLunch() {
           ${alltid.length ? `<div class="rubrik">Alltid på menyn</div>${alltid.map(r => ratt(r)).join("")}` : ""}
         </details>` : ""}
         ${extra?.info?.length ? `<div class="info">${extra.info.map(esc).join(" · ")}</div>` : ""}
-        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}">Meny som PDF</a>${extra.hamtad ? `<span class="tid" title="Senast hämtad">${tidText(extra.hamtad)}</span>` : ""}</div>` : ""}
-      </div>`;
-    }).join("");
+        ${extra?.kalla ? `<div class="kalla"><a href="${esc(extra.kalla)}" target="_blank" rel="noopener">${lanktext(extra.kalla)}</a>${extra.hamtad ? `<span class="tid" title="Senast hämtad">${tidText(extra.hamtad)}</span>` : ""}</div>` : ""}`;
+    };
+
+    const rita = () => {
+      ruta.innerHTML = `
+        <div class="flikar lunchflikar">
+          ${stallen.map(([n, kort]) => `<button type="button" data-stalle="${esc(n)}" aria-pressed="${n === vald}">${esc(kort)}</button>`).join("")}
+          ${LUNCHLANKAR.map(([n, url, titel]) => `<a class="lunchlank" href="${esc(url)}" target="_blank" rel="noopener" title="${esc(titel)}">${esc(n)} ↗</a>`).join("")}
+        </div>
+        <div class="restaurang">${esc(vald)}</div>
+        ${block(vald)}`;
+      ruta.querySelectorAll("[data-stalle]").forEach(b => b.onclick = () => {
+        vald = b.dataset.stalle;
+        try { localStorage.setItem("lunchstalle", vald); } catch {}
+        rita();
+      });
+    };
+    rita();
   } catch (e) {
     ruta.innerHTML = `<span class="fel">Kunde inte hämta lunchmenyer (${esc(e.message)}).</span>`;
   }

@@ -27,7 +27,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
-| Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
+| Lunch: Bättre Mat & Bar (veckomeny-PDF), Lulu och Ai Ramen Kita (fasta menyer) | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
 Varje kort visar diskret i källraden när datan senast hämtades. Står sidan öppen hämtar den
 väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
@@ -181,6 +181,15 @@ GitHub Actions (se schema ovan)
   - Google (Gemini): `blog.google/technology/ai/rss/` och `deepmind.google/blog/rss.xml`.
   - xAI (Grok), Meta och Mistral saknar flöden – deras nyheter fångas av TechCrunch AI och The Verge AI (Atom).
 - [fetch/sources/nyheter.py](fetch/sources/nyheter.py) → tabellen `nyheter` (nyckel: länk). Klarar RSS och Atom.
+
+### Lunch – flikar per restaurang
+- `LUNCHSTALLEN` i [index.html](index.html) styr flikarna; ett ställe vars meny inte går att hämta kan läggas som
+  länk i `LUNCHLANKAR` (Zaap Thai – veckomenyn är en bild på Facebook, som inte går att hämta automatiskt).
+- **Lulu** ([fetch/sources/lunch_lulu.py](fetch/sources/lunch_lulu.py)): fast lunchmeny som text på
+  restauranglulu.se/lunch/ (Elementor). Rubriker är rätter, textstycken beskrivningar, "Lunch 155kr" grundpris.
+- **Ai Ramen Kita** ([fetch/sources/lunch_airamen.py](fetch/sources/lunch_airamen.py)): menyn är en bild, rätterna är
+  inskrivna för hand. Byts bilden (annat filnamn än `MENYBILD`) visas en varning tills rätterna uppdaterats.
+- Varje restaurang hämtas för sig; ett fel i en stoppar inte de andra.
 
 ### Lunch – Bättre Mat & Bar, Gärdet
 - Knappen "Veckans meny" länkar till en PDF (`/_files/ugd/<id>.pdf`) som får ny adress varje vecka.
