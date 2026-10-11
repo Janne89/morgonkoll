@@ -80,6 +80,8 @@ GitHub Actions (se schema ovan)
 - Licens CC BY 4.0 – SMHI anges som källa. (Open-Meteo valdes bort: bara gratis för icke-kommersiellt bruk.)
 - Timvärden: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
   `wind_speed`, `symbol_code` (Wsymb2, 1–27). Kortet visar nuläge, 16 timmar framåt och 5 dagar.
+- Paraplyraden (`paraply()`): timmarna fram till kl 19 (efter 19: imorgon 07–19). Minst 50 % risk eller 0,3 mm/h →
+  "Ta paraply", 30–49 % → "Kanske paraply", annars "Inget paraply behövs". Snö-text om det är under ca 0 °C.
 
 ### Vädervarningar
 - `https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json` – SMHI:s konsekvensbaserade varningar.

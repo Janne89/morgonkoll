@@ -99,6 +99,8 @@
   .nu .symbol { font-size: 44px; line-height: 1; }
   .nu .grader { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; }
   .nu .beskr { color: var(--dampad); font-size: 14px; }
+  .paraply { font-size: 14px; color: var(--dampad); margin: -2px 0 10px; }
+  .paraply.ja { color: var(--text); font-weight: 600; }
   svg.diagram { width: 100%; height: auto; display: block; overflow: visible; }
   svg text { fill: var(--dampad); font-size: 11px; }
   svg .tempetikett { fill: var(--text); font-size: 11.5px; font-weight: 600; }
@@ -595,6 +597,32 @@ function visaTid(id, iso, prefix = "") {
 
 // --- Väder ---
 
+// Paraply eller inte: tittar på timmarna fram till kl 19 idag (efter 19: imorgon 07–19).
+const PARAPLY_SLUT = 19, PARAPLY_START_IMORGON = 7;
+function paraply(timmar) {
+  const nu = lokal(new Date());
+  const imorgon = nu.timme >= PARAPLY_SLUT;
+  const dag = imorgon ? lokal(new Date(Date.now() + 864e5)).datum : nu.datum;
+  const period = timmar.filter(t => {
+    const l = lokal(t.tid);
+    return l.datum === dag && l.timme < PARAPLY_SLUT && (!imorgon || l.timme >= PARAPLY_START_IMORGON);
+  });
+  if (!period.length) return "";
+  const risk = t => t.probability_of_precipitation ?? 0;
+  const blott = t => risk(t) >= 50 || t.precipitation_amount_mean >= 0.3;
+  const kanske = t => risk(t) >= 30;
+  const forsta = period.find(blott) || period.find(kanske);
+  const nar = imorgon ? "imorgon" : "idag";
+  if (!forsta) return `<div class="paraply">☀ Inget paraply behövs ${nar}${imorgon ? "" : " (fram till kl 19)"}</div>`;
+  const maxRisk = Math.max(...period.map(risk));
+  const sno = forsta.air_temperature <= 0.5;
+  const klocka = lokal(forsta.tid).timme;
+  const nuRegn = !imorgon && forsta === period[0];
+  const tid = nuRegn ? (sno ? "snöar nu" : "regnar nu") : `${sno ? "snö" : "regn"} ${imorgon ? "imorgon " : ""}från kl ${String(klocka).padStart(2, "0")}`;
+  if (!blott(forsta)) return `<div class="paraply">🌂 Kanske paraply – risk för ${nuRegn ? (sno ? "snö nu" : "regn nu") : tid} (${maxRisk} %)</div>`;
+  return `<div class="paraply ja">${sno ? "❄ Klä dig för snö" : "☂ Ta paraply"} – ${tid} (upp till ${maxRisk} %)</div>`;
+}
+
 async function visaVader() {
   const ruta = document.getElementById("vader-innehall");
   try {
@@ -618,6 +646,7 @@ async function visaVader() {
           <div class="beskr">${esc(text)} · vind ${Math.round(forsta.wind_speed)} m/s</div>
         </div>
       </div>
+      ${paraply(timmar)}
       ${diagram(timmar.slice(0, TIMMAR_I_DIAGRAM))}
       ${dagsoversikt(timmar)}`;
   } catch (e) {
