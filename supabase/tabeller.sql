@@ -69,7 +69,7 @@ create table if not exists systembolaget (
   hamtad        timestamptz not null default now()
 );
 
--- Vad som trendar på Google i Sverige just nu. Ersätts helt vid varje hämtning.
+-- Vad som trendar på Google i Sverige (som trends.google.se/trending). Ersätts helt vid varje hämtning.
 create table if not exists trender (
   sokord       text primary key,
   trafik       text,
@@ -80,6 +80,9 @@ create table if not exists trender (
   publicerad   timestamptz not null,
   hamtad       timestamptz not null default now()
 );
+-- Googles ordning och relaterade sökningar (förklaring när nyhetsartikel saknas).
+alter table trender add column if not exists plats      int not null default 0;
+alter table trender add column if not exists relaterade text[] not null default '{}';
 
 -- RLS: alla (anon) får läsa, ingen får skriva. Hämtningen använder den hemliga
 -- nyckeln (service_role) som går förbi RLS.

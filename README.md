@@ -15,7 +15,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
 | Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
-| Trendar på Google (Sverige) | [Google Trends](https://trends.google.com/trending?geo=SE) RSS | GitHub Actions → Supabase | Med nyheterna |
+| Trendar på Google (Sverige) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
@@ -112,11 +112,15 @@ GitHub Actions (se schema ovan)
   och `lunch_info`. Veckans rader ersätts vid varje hämtning.
 
 ### Trendar på Google
-- `https://trends.google.com/trending/rss?geo=SE` – de ~10 senaste trenderna med ungefärligt antal
-  sökningar (`approx_traffic`, t.ex. "500+") och nyhetsartiklar. Vi sparar den första artikeln som förklaring.
+- **Listan** kommer från samma interna API som trends.google.se/trending använder
+  (`POST trends.google.com/_/TrendsUi/data/batchexecute`, rpc `i0OFE`): alla trender senaste 24 h i Googles
+  ordning, med ungefärlig sökvolym och relaterade sökningar. Inofficiellt – kan sluta fungera.
+- **Nyhetsartiklar** finns bara i RSS-flödet `trends.google.com/trending/rss?geo=SE`, som i sin tur bara har de
+  ~10 *senast startade* trenderna (därför skilde sig RSS-listan från sidan). Rubriken används som förklaring
+  när sökordet finns där, annars "Även: <relaterade sökningar>". Fungerar inte det interna API:et används bara RSS.
   (Gamla adressen `.../trends/trendingsearches/daily/rss` är nedlagd.)
-- [fetch/sources/trender.py](fetch/sources/trender.py) → tabellen `trender`, som ersätts helt vid varje hämtning.
-  Kortet sorterar på antal sökningar; sökordet länkar till en Google-sökning, raden under till artikeln.
+- [fetch/sources/trender.py](fetch/sources/trender.py) → tabellen `trender` (de 15 första), som ersätts helt
+  vid varje hämtning. Kortet visar de 10 första; sökordet länkar till en Google-sökning, raden under till artikeln.
 
 ### Systembolaget – släpp
 - Inget öppet API finns längre (gamla `api-portal.systembolaget.se` är nedlagd). Vi använder samma sök-API

@@ -228,7 +228,7 @@
     <section class="kort" id="trender">
       <h2>Trendar på Google · Sverige</h2>
       <div id="trender-innehall">Hämtar trender…</div>
-      <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> (ungefärligt antal sökningar)<span class="tid" id="trender-tid"></span></div>
+      <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> · senaste 24 h, ungefärligt antal sökningar<span class="tid" id="trender-tid"></span></div>
     </section>
 
     <section class="kort" id="systembolaget">
@@ -603,15 +603,19 @@ async function visaSL() {
 
 // --- Google Trends ---
 
+const ANTAL_TRENDER = 10;
+
 async function visaTrender() {
   const ruta = document.getElementById("trender-innehall");
   try {
-    const trender = await supabase("trender", "select=*&order=trafik_tal.desc,publicerad.desc");
+    const trender = await supabase("trender", `select=*&order=plats,trafik_tal.desc&limit=${ANTAL_TRENDER}`);
     visaTid("trender-tid", senaste(trender));
     if (!trender.length) { ruta.textContent = "Inga trender hämtade än."; return; }
     ruta.innerHTML = trender.map(t => {
       const sokord = t.sokord[0].toUpperCase() + t.sokord.slice(1);
-      const forklaring = t.nyhet_rubrik ? `${esc(t.nyhet_rubrik)}${t.nyhet_kalla ? ` · ${esc(t.nyhet_kalla)}` : ""}` : "";
+      const forklaring = t.nyhet_rubrik
+        ? `${esc(t.nyhet_rubrik)}${t.nyhet_kalla ? ` · ${esc(t.nyhet_kalla)}` : ""}`
+        : (t.relaterade || []).length ? `Även: ${t.relaterade.map(esc).join(", ")}` : "";
       return `
         <div class="trend">
           <a class="sokord" href="https://www.google.com/search?q=${encodeURIComponent(t.sokord)}" target="_blank" rel="noopener">${esc(sokord)}</a>

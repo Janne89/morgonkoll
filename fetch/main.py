@@ -77,7 +77,7 @@ def googletrender(db):
     rader = trender.hamta()
     print(f"Google Trends: {len(rader)} sökord")
     for t in rader:
-        print(f"  {t['trafik'] or '':>6} {t['sokord']} – {t['nyhet_rubrik'] or ''}")
+        print(f"  {t['plats']:>2}. {t['trafik'] or '':>7} {t['sokord']} – {t['nyhet_rubrik'] or ', '.join(t['relaterade'])}")
     if not rader:
         raise RuntimeError("Google Trends: tomt flöde – har formatet ändrats?")
     if db:
