@@ -79,6 +79,8 @@ GitHub Actions (startas av Supabase pg_cron, se schema ovan)
   (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), aldrig i koden. Den publika nyckeln ligger i `index.html`.
   GitHub-token för att starta workflowen ligger bara i Supabase Vault (`github_hamta`).
 - **Stil i koden:** svenska namn och kommentarer.
+- **Ikoner:** [ikoner/ikon.svg](ikoner/ikon.svg) är källan; PNG:erna (hemskärm, `manifest.webmanifest`) och
+  delningsbilden `ikoner/dela.png` (og:image) är renderade från den.
 
 ## Detaljer per källa
 
