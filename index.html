@@ -164,6 +164,20 @@
   .avgang .nar { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .avgang.installd .mal, .avgang.installd .nar { text-decoration: line-through; color: var(--dampad); }
 
+  /* Vädervarningar – nivån visas med text och ikon, färgen är ett tillägg */
+  .varning { display: block; margin: -2px 0 12px; padding: 8px 10px; border-radius: 8px; border-left: 4px solid; background: var(--markering); color: inherit; text-decoration: none; font-size: 14px; }
+  .varning:hover strong { text-decoration: underline; }
+  .varning.gul { border-color: #e0b100; } .varning.orange { border-color: #e8710a; } .varning.rod { border-color: #c62828; }
+  .varning-nar { display: block; font-size: 13px; color: var(--dampad); }
+
+  /* SL-störningar */
+  #sl-storningar:not(:empty) { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--linje); }
+  .storning { font-size: 14px; padding: 3px 0; }
+  .storning::before { content: "⚠ "; color: var(--accent); }
+  .storning .vilka { font-weight: 600; }
+  #sl-storningar details.hela summary { font-size: 13px; margin-top: 2px; }
+  #sl-storningar details .storning { color: var(--dampad); }
+
   /* Elpris */
   #elpris .flikar { margin: -4px 0 6px; }
   #elpris .flikavdelare { width: 10px; }
@@ -171,6 +185,8 @@
   .elnu .varde { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
   .elnu .nar { margin-left: 6px; }
   .elsammanfattning { font-size: 14px; color: var(--dampad); margin-bottom: 8px; }
+  .elniva { font-size: 14px; color: var(--dampad); margin: -4px 0 8px; }
+  .elniva strong { color: var(--text); }
   .eltopp { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   svg.elkarta { width: 46px; height: auto; flex: none; margin-bottom: 4px; }
   @media (min-width: 420px) { svg.elkarta { margin-top: -30px; } }   /* bredvid knapparna när de får plats */
@@ -283,6 +299,7 @@
     <div class="kolumn vanster">
     <section class="kort" id="vader">
       <h2>Väder · Stockholm</h2>
+      <div id="vader-varningar"></div>
       <div id="vader-innehall">Hämtar prognos…</div>
       <div class="kalla">Källa: <a href="https://www.smhi.se/">SMHI</a> (CC BY 4.0)<span class="tid" id="vader-tid"></span></div>
     </section>
@@ -327,6 +344,7 @@
     <section class="kort" id="sl">
       <h2>Avgångar · SL</h2>
       <div id="sl-innehall">Hämtar avgångar…</div>
+      <div id="sl-storningar"></div>
       <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
     </section>
 
@@ -749,11 +767,13 @@ async function hamtaAvgangar(h) {
   const svar = await fetch(`https://transport.integration.sl.se/v1/sites/${h.id}/departures?forecast=60`);
   if (!svar.ok) throw new Error(`SL svarade ${svar.status}`);
   const { departures } = await svar.json();
-  return departures
+  const relevanta = departures
     .filter(a => !h.linjer || h.linjer.includes(a.line.designation))
-    .filter(a => !h.riktning || a.direction_code === h.riktning)
-    .sort((a, b) => (a.expected || a.scheduled).localeCompare(b.expected || b.scheduled))
-    .slice(0, ANTAL_AVGANGAR);
+    .filter(a => !h.riktning || a.direction_code === h.riktning);
+  return {
+    avgangar: relevanta.sort((a, b) => (a.expected || a.scheduled).localeCompare(b.expected || b.scheduled)).slice(0, ANTAL_AVGANGAR),
+    linjer: relevanta.map(a => a.line.id),
+  };
 }
 
 function avgangsrad(a) {
@@ -768,17 +788,32 @@ function avgangsrad(a) {
     </div>`;
 }
 
+// Senast lyckade svar per hållplats – visas om ett anrop misslyckas (t.ex. 429, för många anrop).
+const senasteAvgangar = {};
+
 async function visaSL() {
   const ruta = document.getElementById("sl-innehall");
-  const resultat = await Promise.allSettled(HALLPLATSER.map(hamtaAvgangar));
+  const resultat = (await Promise.allSettled(HALLPLATSER.map(hamtaAvgangar))).map((r, i) => {
+    const id = HALLPLATSER[i].id;
+    if (r.status === "fulfilled") senasteAvgangar[id] = r.value;
+    else if (senasteAvgangar[id]) return { status: "fulfilled", value: senasteAvgangar[id], gammal: true };
+    return r;
+  });
+  // SL:s tider är svensk lokaltid utan tidszon, t.ex. "2026-10-11T10:06:00".
+  const nu = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" }).replace(" ", "T");
   ruta.innerHTML = HALLPLATSER.map((h, i) => {
     const r = resultat[i];
+    // I ett gammalt svar tas passerade avgångar bort, och "3 min" byts mot klockslag.
+    if (r.gammal) r.value = { ...r.value, avgangar: r.value.avgangar
+      .filter(a => (a.expected || a.scheduled) >= nu)
+      .map(a => ({ ...a, display: (a.expected || a.scheduled).slice(11, 16) })) };
     const innehall = r.status === "rejected"
       ? `<span class="fel">Kunde inte hämta avgångar (${esc(r.reason.message)}).</span>`
-      : r.value.length ? r.value.map(avgangsrad).join("") : `<div class="info">Inga avgångar närmaste timmen.</div>`;
+      : r.value.avgangar.length ? r.value.avgangar.map(avgangsrad).join("") : `<div class="info">Inga avgångar närmaste timmen.</div>`;
     return `<div class="hallplats"><div class="rubrik">${esc(h.namn)}</div>${innehall}</div>`;
   }).join("");
   if (resultat.some(r => r.status === "fulfilled")) visaTid("sl-tid", new Date().toISOString());
+  visaStorningar(new Set(resultat.flatMap(r => r.status === "fulfilled" ? r.value.linjer : [])));
 }
 
 // --- Elpris ---
@@ -869,7 +904,7 @@ async function visaElpris() {
 
   async function rita() {
     try {
-      const [prisIdag, prisImorgon] = await Promise.all([hamtaElpris(idag, omrade), hamtaElpris(imorgon, omrade)]);
+      const [prisIdag, prisImorgon, vecka] = await Promise.all([hamtaElpris(idag, omrade), hamtaElpris(imorgon, omrade), veckosnitt(omrade, idag)]);
       if (!prisIdag) throw new Error("inga priser för idag");
       if (dag === "imorgon" && !prisImorgon) dag = "idag";
       const visade = dag === "idag" ? prisIdag : prisImorgon;
@@ -891,6 +926,7 @@ async function visaElpris() {
           <div>
             ${dag === "idag" && kvart ? `<div class="elnu"><span class="varde">${Math.round(kvart.ore)}</span> öre/kWh <span class="nar">just nu, ${klocka(kvart.start)}–${klocka(kvart.slut)}</span></div>` : ""}
             <div class="elsammanfattning">Lägst ${ore(min.ore)} (${timmeText(min.h)}–${timmeText((min.h + 1) % 24)}) · högst ${ore(max.ore)} (${timmeText(max.h)}–${timmeText((max.h + 1) % 24)}) · snitt ${ore(snitt)}</div>
+            ${prisniva(snitt, vecka)}
           </div>
           ${elkarta(omrade)}
         </div>
@@ -919,6 +955,134 @@ async function visaElpris() {
     }
   }
   await rita();
+}
+
+// --- Soltider ---
+
+// Sol upp/ner enligt SunCalc-algoritmen (Vladimir Agafonkin, BSD-2). Höjd −0,833° = övre solkanten vid horisonten.
+const SOL_LAT = 59.33, SOL_LON = 18.07;
+function soltider(datum) {
+  const rad = Math.PI / 180, dygn = 864e5, J1970 = 2440588, J2000 = 2451545, J0 = 0.0009, e = rad * 23.4397;
+  const dagar = datum.valueOf() / dygn - 0.5 + J1970 - J2000;
+  const lw = rad * -SOL_LON, phi = rad * SOL_LAT;
+  const n = Math.round(dagar - J0 - lw / (2 * Math.PI));
+  const transit = (ht) => J0 + (ht + lw) / (2 * Math.PI) + n;
+  const ds = transit(0);
+  const M = rad * (357.5291 + 0.98560028 * ds);
+  const L = M + rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)) + rad * 102.9372 + Math.PI;
+  const dek = Math.asin(Math.sin(e) * Math.sin(L));
+  const solJ = (d) => J2000 + d + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+  const cosW = (Math.sin(-0.833 * rad) - Math.sin(phi) * Math.sin(dek)) / (Math.cos(phi) * Math.cos(dek));
+  if (Math.abs(cosW) > 1) return null;              // midnattssol/polarnatt – inte i Stockholm
+  const middag = solJ(ds), ner = solJ(transit(Math.acos(cosW)));
+  const tillDatum = j => new Date((j + 0.5 - J1970) * dygn);
+  return { upp: tillDatum(middag - (ner - middag)), ner: tillDatum(ner) };
+}
+
+function soltext() {
+  const idag = soltider(new Date()), igar = soltider(new Date(Date.now() - 864e5));
+  if (!idag) return null;
+  const langd = Math.round((idag.ner - idag.upp) / 60e3);
+  const skillnad = igar ? langd - Math.round((igar.ner - igar.upp) / 60e3) : 0;
+  const tecken = skillnad > 0 ? `+${skillnad}` : skillnad < 0 ? `−${-skillnad}` : "±0";
+  return `☀ ${klocka(idag.upp)}–${klocka(idag.ner)} · ${Math.floor(langd / 60)} h ${langd % 60} min (${tecken} min)`;
+}
+
+// --- Vädervarningar (SMHI) ---
+
+const SMHI_VARNINGAR = "https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json";
+const VARNINGSNIVAER = { YELLOW: ["gul", "Gul varning"], ORANGE: ["orange", "Orange varning"], RED: ["rod", "Röd varning"] };
+const VARNINGSOMRADE = /stockholm/i;
+
+async function visaVarningar() {
+  const ruta = document.getElementById("vader-varningar");
+  try {
+    const svar = await fetch(SMHI_VARNINGAR);
+    if (!svar.ok) throw new Error(`SMHI svarade ${svar.status}`);
+    const nu = new Date();
+    const varningar = [];
+    for (const v of await svar.json()) {
+      for (const o of v.warningAreas || []) {
+        const niva = VARNINGSNIVAER[o.warningLevel?.code];
+        const omraden = (o.affectedAreas || []).map(a => a.sv);
+        if (!niva || !omraden.some(a => VARNINGSOMRADE.test(a))) continue;
+        if (o.approximateEnd && new Date(o.approximateEnd) < nu) continue;
+        varningar.push({ niva, o, handelse: o.eventDescription?.sv || v.event?.sv || "" });
+      }
+    }
+    const ordning = n => ["rod", "orange", "gul"].indexOf(n[0]);
+    varningar.sort((a, b) => ordning(a.niva) - ordning(b.niva));
+    const tidpunkt = iso => `${kortDatum(iso)} ${klocka(new Date(iso))}`;
+    ruta.innerHTML = varningar.map(({ niva: [klass, text], o, handelse }) => {
+      const nar = [o.approximateStart && `från ${tidpunkt(o.approximateStart)}`, o.approximateEnd && `till ${tidpunkt(o.approximateEnd)}`].filter(Boolean).join(" ");
+      const beskrivning = (o.descriptions || []).map(d => d.text?.sv).filter(Boolean).join("\n\n");
+      return `<a class="varning ${klass}" href="https://www.smhi.se/vader/varningar-och-brandrisk/varningar-och-meddelanden/varningar" target="_blank" rel="noopener" title="${esc(beskrivning)}">
+        <strong>⚠ ${text}</strong> · ${esc(handelse)}<span class="varning-nar">${esc(o.areaName?.sv || "")}${nar ? ` · ${esc(nar)}` : ""}</span></a>`;
+    }).join("");
+  } catch (e) {
+    ruta.innerHTML = "";      // varningar är ett tillägg – tyst om det inte går
+    console.warn("Vädervarningar:", e);
+  }
+}
+
+// --- SL-störningar ---
+
+const SL_STORNINGAR = "https://deviations.integration.sl.se/v1/messages";
+const NY_STORNING = 24 * 3600e3;     // skapade senaste dygnet visas direkt, äldre under "övriga"
+let storningsCache = { nyckel: "", tid: 0, lista: [] };
+
+async function hamtaStorningar(linjer, platser) {
+  const nyckel = [...linjer].sort().join(",") + "|" + platser.join(",");
+  if (storningsCache.nyckel === nyckel && Date.now() - storningsCache.tid < 5 * 60e3) return storningsCache.lista;
+  const fragor = [];
+  if (linjer.size) fragor.push(new URLSearchParams([["future", "false"], ...[...linjer].map(l => ["line", l])]));
+  fragor.push(new URLSearchParams([["future", "false"], ...platser.map(p => ["site", p])]));
+  const svar = await Promise.all(fragor.map(async q => {
+    const r = await fetch(`${SL_STORNINGAR}?${q}`);
+    if (!r.ok) throw new Error(`SL svarade ${r.status}`);
+    return r.json();
+  }));
+  const unika = new Map();
+  for (const s of svar.flat()) unika.set(s.deviation_case_id, s);
+  const lista = [...unika.values()].sort((a, b) => (b.created || "").localeCompare(a.created || ""));
+  storningsCache = { nyckel, tid: Date.now(), lista };
+  return lista;
+}
+
+function storningsrad(s) {
+  const m = (s.message_variants || []).find(v => v.language === "sv") || s.message_variants?.[0] || {};
+  return `<div class="storning" title="${esc(m.details || "")}"><span class="vilka">${esc(m.scope_alias || "")}</span> ${esc(m.header || "")}</div>`;
+}
+
+async function visaStorningar(linjer) {
+  const ruta = document.getElementById("sl-storningar");
+  try {
+    const lista = await hamtaStorningar(linjer, HALLPLATSER.map(h => h.id));
+    const grans = Date.now() - NY_STORNING;
+    const nya = lista.filter(s => new Date(s.created) >= grans), ovriga = lista.filter(s => new Date(s.created) < grans);
+    ruta.innerHTML = `
+      ${nya.map(storningsrad).join("")}
+      ${ovriga.length ? `<details class="hela"><summary>${nya.length ? "Övriga störningar" : "Störningar på linjerna"} (${ovriga.length})</summary>${ovriga.map(storningsrad).join("")}</details>` : ""}`;
+  } catch (e) {
+    ruta.innerHTML = "";
+    console.warn("SL-störningar:", e);
+  }
+}
+
+// --- Elpris jämfört med senaste veckan ---
+
+async function veckosnitt(omrade, idag) {
+  const dagar = Array.from({ length: 7 }, (_, i) => lokal(new Date(new Date(`${idag}T12:00:00`) - (i + 1) * 864e5)).datum);
+  const priser = (await Promise.all(dagar.map(d => hamtaElpris(d, omrade).catch(() => null)))).filter(Boolean).flat();
+  return priser.length ? priser.reduce((s, p) => s + p.ore, 0) / priser.length : null;
+}
+
+function prisniva(snitt, vecka) {
+  if (!vecka) return "";
+  const diff = (snitt / vecka - 1) * 100;
+  const [ord, pil] = diff <= -15 ? ["Lågt", "↓"] : diff >= 15 ? ["Högt", "↑"] : ["Normalt", "→"];
+  const procent = Math.abs(diff) < 0.5 ? "" : ` (${diff > 0 ? "+" : "−"}${Math.round(Math.abs(diff))} %)`;
+  return `<div class="elniva"><strong>${pil} ${ord}</strong> jämfört med senaste veckan · veckosnitt ${ore(vecka)}${procent}</div>`;
 }
 
 // --- Google Trends ---
@@ -1563,6 +1727,8 @@ async function visaDagen() {
 
   const tema = TEMADAGAR[`${man}-${dag}`] || rorligaTemadagar(+ar)[`${man}-${dag}`];
   if (tema && !delar.some(([t]) => t.startsWith(tema.split(" ")[0]))) delar.push([tema, true]);
+  const sol = soltext();
+  if (sol) delar.push([sol, false]);
 
   ruta.innerHTML = delar.map(([t, speciell]) => `<span${speciell ? ' class="speciell"' : ""}>${esc(t)}</span>`).join("");
 }
@@ -1576,6 +1742,7 @@ document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${d
 visaDagen();
 startaVerktyg();
 visaVader();
+visaVarningar();
 visaElpris();
 visaSL();
 visaLunch();
@@ -1588,6 +1755,7 @@ visaSystembolaget();
 setInterval(() => {
   if (document.visibilityState !== "visible") return;
   visaVader();
+  visaVarningar();
   visaElpris();
   visaNyheter();
   visaTrender();

@@ -11,6 +11,9 @@ Live: https://janne89.github.io/morgonkoll/
 | Väder | [SMHI](https://www.smhi.se/) öppna prognos-API | I webbläsaren | Varje gång sidan öppnas (SMHI gör ny prognos ungefär varje timme) |
 | SL-avgångar: Arenan, Solna station | [SL Transport API](https://www.trafiklab.se/api/our-apis/sl/transport/) (öppet, ingen nyckel) | I webbläsaren | Varje minut medan fliken syns (realtid) |
 | Elpris idag/imorgon per elområde (SE1–SE4) | [elprisetjustnu.se](https://www.elprisetjustnu.se/) (Nord Pool) | I webbläsaren | När sidan öppnas och var 15:e min (morgondagens priser ca 13:00) |
+| Vädervarningar (gul/orange/röd) för Stockholms län | [SMHI](https://www.smhi.se/) öppna varnings-API | I webbläsaren | När sidan öppnas och var 15:e min |
+| Störningar på SL-linjerna | [SL Deviations API](https://www.trafiklab.se/api/our-apis/sl/deviations/) | I webbläsaren | Med avgångarna, högst var 5:e min |
+| Soluppgång, solnedgång, dagslängd | Uträknat i webbläsaren (SunCalc-algoritmen) | – | – |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -73,10 +76,21 @@ GitHub Actions (se schema ovan)
 - Timvärden: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
   `wind_speed`, `symbol_code` (Wsymb2, 1–27). Kortet visar nuläge, 16 timmar framåt och 5 dagar.
 
+### Vädervarningar
+- `https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json` – SMHI:s konsekvensbaserade varningar.
+  Bara nivåerna gul, orange och röd där något drabbat område matchar `VARNINGSOMRADE` (Stockholm) visas, överst i
+  väderkortet. "Meddelanden" (t.ex. risk för vattenbrist) visas inte. Inga varningar → ingenting syns.
+
+### Soltider
+- Räknas i webbläsaren för Stockholm (59,33 N, 18,07 E) med SunCalc-algoritmen; visas i sidhuvudet med dagslängd
+  och skillnad mot i går.
+
 ### Elpris
 - `https://www.elprisetjustnu.se/api/v1/prices/ÅÅÅÅ/MM-DD_SE3.json` – spotpris per kvart, exkl. moms.
   Kortet visar inkl. 25 % moms (utan nätavgift och elhandlarens påslag), timmedel i diagrammet,
   priset just nu och billigaste 3 timmar i följd framåt. Morgondagen (404 innan ca 13:00) får egen flik.
+- Prisnivå: dagens snitt jämfört med snittet för de 7 föregående dagarna (samma API). Minst 15 % under = lågt,
+  minst 15 % över = högt, annars normalt.
 - Elområdet väljs med knapparna eller i den lilla kartan och sparas i webbläsaren (förvalt SE3).
   Kartan (`ELKARTA` i [index.html](index.html)) är schematisk: Natural Earths län (public domain), förenklade och
   sammanslagna till elområden – SE1 Norrbotten; SE2 Västerbotten, Jämtland, Västernorrland, Gävleborg;
@@ -94,6 +108,12 @@ GitHub Actions (se schema ovan)
 - Temadagar som inte finns i API:et ligger i `TEMADAGAR` (nyckel `"MM-DD"`) i [index.html](index.html).
   Rörliga dagar (fettisdagen, mors/fars dag, surströmmingspremiären, Black Friday, advent)
   räknas ut i `rorligaTemadagar()`.
+
+### SL-störningar
+- `https://deviations.integration.sl.se/v1/messages?future=false&line=…` för linjerna som går från hållplatserna i
+  `HALLPLATSER` (efter filter), plus `site=…` för själva hållplatserna. Störningar skapade senaste dygnet visas direkt
+  (troligen akuta, t.ex. signalfel), äldre och långvariga under "Övriga störningar". Detaljtexten syns vid hovring.
+- Misslyckas ett avgångsanrop (t.ex. 429, för många anrop) visas senast hämtade avgångar med klockslag.
 
 ### Börs & valuta
 - Index via Yahoo Finance chart-API (`query1.finance.yahoo.com/v8/finance/chart/<symbol>`):
