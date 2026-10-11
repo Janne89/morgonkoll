@@ -29,17 +29,28 @@ def hitta_nyckel():
 
 
 def sok(nyckel, fran, till):
-    produkter, sida = [], 1
-    while sida > 0:
-        svar = requests.get(SOK, params={
-            "size": 30, "page": sida,
-            "productLaunch.min": fran.isoformat(), "productLaunch.max": till.isoformat(),
-        }, headers={**HEADERS, "Ocp-Apim-Subscription-Key": nyckel}, timeout=30)
-        svar.raise_for_status()
-        data = svar.json()
-        produkter += data["products"]
-        sida = data["metadata"]["nextPage"]
-    return produkter
+    """Alla produkter med säljstart i intervallet, utan dubbletter.
+
+    Sidindelningen är inte stabil: produkter med samma sorteringsvärde kan hamna
+    på två sidor och andra falla bort. Saknas något görs en omgång till med en
+    annan sortering, och resultaten slås ihop.
+    """
+    produkter = {}
+    for sortering in ("Name", "Price", "ProductLaunchDate"):
+        sida = 1
+        while sida > 0:
+            svar = requests.get(SOK, params={
+                "size": 30, "page": sida, "sortBy": sortering, "sortDirection": "Ascending",
+                "productLaunch.min": fran.isoformat(), "productLaunch.max": till.isoformat(),
+            }, headers={**HEADERS, "Ocp-Apim-Subscription-Key": nyckel}, timeout=30)
+            svar.raise_for_status()
+            data = svar.json()
+            for p in data["products"]:
+                produkter[p["productNumber"]] = p
+            sida = data["metadata"]["nextPage"]
+        if len(produkter) >= data["metadata"]["docCount"]:
+            break
+    return list(produkter.values())
 
 
 def hamta(idag=None):

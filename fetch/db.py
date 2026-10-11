@@ -54,9 +54,15 @@ class Databas:
                     "restaurang,ar,vecka")
 
     def ersatt_alla(self, tabell, rader, nyckel):
-        """Byter ut hela tabellens innehåll mot de nyss hämtade raderna."""
-        self._anrop("DELETE", tabell, params={nyckel: "not.is.null"})
+        """Byter ut hela tabellens innehåll mot de nyss hämtade raderna.
+
+        Skriver först och raderar sedan det som inte kom med (äldre hamtad),
+        så att ett fel inte lämnar tabellen tom. Alla rader ska ha samma hamtad.
+        """
+        if not rader:
+            return
         self.upsert(tabell, rader, nyckel)
+        self._anrop("DELETE", tabell, params={"hamtad": f"lt.{rader[0]['hamtad']}"})
 
     def upsert(self, tabell, rader, nyckel):
         if rader:
