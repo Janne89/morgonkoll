@@ -74,14 +74,15 @@ def slapp(db):
 
 
 def googletrender(db):
-    rader = trender.hamta()
-    print(f"Google Trends: {len(rader)} sökord")
-    for t in rader:
-        print(f"  {t['plats']:>2}. {t['trafik'] or '':>7} {t['sokord']} – {t['nyhet_rubrik'] or ', '.join(t['relaterade'])}")
-    if not rader:
-        raise RuntimeError("Google Trends: tomt flöde – har formatet ändrats?")
-    if db:
-        db.ersatt_alla("trender", rader, "sokord")
+    regioner, fel = trender.hamta()
+    for kod, rader in regioner.items():
+        print(f"Google Trends {kod}: {len(rader)} sökord")
+        for t in rader[:5]:
+            print(f"  {t['plats']:>2}. {t['land']} {t['trafik'] or '':>9} {t['sokord']} – {t['nyhet_rubrik'] or ', '.join(t['relaterade'])}")
+        if db:
+            db.ersatt_alla("trender", rader, "region,sokord", {"region": f"eq.{kod}"})
+    if fel or not any(regioner.values()):
+        raise RuntimeError("Google Trends: " + ("; ".join(fel) or "tomt flöde – har formatet ändrats?"))
 
 
 def styrranta(db):

@@ -83,6 +83,11 @@ create table if not exists trender (
 -- Googles ordning och relaterade sökningar (förklaring när nyhetsartikel saknas).
 alter table trender add column if not exists plats      int not null default 0;
 alter table trender add column if not exists relaterade text[] not null default '{}';
+-- Flera regioner (SE, US, EU, AS) – samma sökord kan finnas i flera, så nyckeln blir (region, sokord).
+alter table trender add column if not exists region text not null default 'SE';
+alter table trender add column if not exists land   text;
+alter table trender drop constraint if exists trender_pkey;
+alter table trender add primary key (region, sokord);
 
 -- Styrräntan, kommande räntebesked och senaste penningpolitiska pressmeddelanden. En rad.
 create table if not exists riksbanken (

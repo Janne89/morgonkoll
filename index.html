@@ -72,7 +72,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #evenemang { order: 9; } #systembolaget { order: 10; } #sport { order: 11; } #verktyg { order: 12; }
+  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #polymarket { order: 6; } #priser { order: 7; } #sl { order: 8; } #lunch { order: 9; } #evenemang { order: 10; } #systembolaget { order: 11; } #sport { order: 12; } #verktyg { order: 13; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -343,6 +343,16 @@
   .evenemangmeta { font-size: 13px; color: var(--dampad); }
   #evenemang .rubrik { margin-top: 0; }
 
+  /* Polymarket */
+  .poly { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--linje); }
+  .poly:last-child { border-bottom: 0; }
+  .polytitel { font-weight: 600; color: inherit; text-decoration: none; }
+  .polytitel:hover { text-decoration: underline; }
+  .polyvolym { font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .polyledare { grid-column: 1 / -1; font-size: 14px; color: var(--dampad); }
+  .trendland { display: inline-block; font-size: 11px; font-weight: 600; color: var(--dampad); border: 1px solid var(--linje); border-radius: 4px; padding: 0 4px; margin-right: 6px; vertical-align: 1px; }
+  #trender .flikar { margin-bottom: 4px; }
+
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
   .slapp:last-of-type { border-bottom: 0; }
@@ -377,6 +387,7 @@
     <a href="#bors">Börs</a>
     <a href="#nyheter">Nyheter</a>
     <a href="#trender">Trender</a>
+    <a href="#polymarket">Polymarket</a>
     <a href="#sl">SL</a>
     <a href="#lunch">Lunch</a>
     <a href="#evenemang">Evenemang</a>
@@ -406,9 +417,15 @@
     </section>
 
     <section class="kort" id="trender">
-      <h2>Trendar på Google · Sverige</h2>
+      <h2>Trendar på Google</h2>
       <div id="trender-innehall">Hämtar trender…</div>
-      <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> · senaste 24 h, ungefärligt antal sökningar<span class="tid" id="trender-tid"></span></div>
+      <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> · senaste 24 h, ungefärligt antal sökningar · Europa: GB, DE, FR, ES, IT · Asien: IN, SG, PH<span class="tid" id="trender-tid"></span></div>
+    </section>
+
+    <section class="kort" id="polymarket">
+      <h2>Mest spelat · Polymarket</h2>
+      <div id="polymarket-innehall">Hämtar marknader…</div>
+      <div class="kalla">Källa: <a href="https://polymarket.com/">Polymarket</a> · handelsvolym senaste veckan, sannolikhet enligt marknadens pris<span class="tid" id="polymarket-tid"></span></div>
     </section>
 
     <section class="kort" id="priser">
@@ -1655,29 +1672,101 @@ async function visaEvenemang() {
 // --- Google Trends ---
 
 const ANTAL_TRENDER = 10;
+// Flikar: region i tabellen → namn. Europa och Asien är flera länder (landskod visas vid sökordet).
+const TRENDREGIONER = [["SE", "Sverige"], ["US", "USA"], ["EU", "Europa"], ["AS", "Asien"]];
+const LANDNAMN = { GB: "Storbritannien", DE: "Tyskland", FR: "Frankrike", ES: "Spanien", IT: "Italien", IN: "Indien", SG: "Singapore", PH: "Filippinerna", US: "USA", SE: "Sverige" };
 
 async function visaTrender() {
   const ruta = document.getElementById("trender-innehall");
   try {
-    const trender = await supabase("trender", `select=*&order=plats,trafik_tal.desc&limit=${ANTAL_TRENDER}`);
-    visaTid("trender-tid", senaste(trender));
-    if (!trender.length) { ruta.textContent = "Inga trender hämtade än."; return; }
-    ruta.innerHTML = trender.map(t => {
+    const alla = await supabase("trender", "select=*&order=plats,trafik_tal.desc");
+    visaTid("trender-tid", senaste(alla));
+    if (!alla.length) { ruta.textContent = "Inga trender hämtade än."; return; }
+    const region = t => t.region || "SE";
+    const flikar = TRENDREGIONER.filter(([k]) => alla.some(t => region(t) === k));
+    let vald = "SE";
+    try { vald = localStorage.getItem("trendregion") || "SE"; } catch {}
+    if (!flikar.some(([k]) => k === vald)) vald = flikar[0][0];
+
+    const rad = t => {
       const sokord = t.sokord[0].toUpperCase() + t.sokord.slice(1);
       const forklaring = t.nyhet_rubrik
         ? `${esc(t.nyhet_rubrik)}${t.nyhet_kalla ? ` · ${esc(t.nyhet_kalla)}` : ""}`
         : (t.relaterade || []).length ? `Även: ${t.relaterade.map(esc).join(", ")}` : "";
+      const land = ["EU", "AS"].includes(region(t)) && t.land
+        ? `<span class="trendland" title="${esc(LANDNAMN[t.land] || t.land)}">${esc(t.land)}</span>` : "";
       return `
         <div class="trend">
-          <a class="sokord" href="https://www.google.com/search?q=${encodeURIComponent(t.sokord)}" target="_blank" rel="noopener">${esc(sokord)}</a>
+          <span>${land}<a class="sokord" href="https://www.google.com/search?q=${encodeURIComponent(t.sokord)}" target="_blank" rel="noopener">${esc(sokord)}</a></span>
           <span class="trafik">${esc(t.trafik || "")}</span>
           ${forklaring ? (t.nyhet_lank
             ? `<a class="forklaring" href="${esc(t.nyhet_lank)}" target="_blank" rel="noopener" title="${forklaring}">${forklaring}</a>`
             : `<span class="forklaring">${forklaring}</span>`) : ""}
         </div>`;
-    }).join("");
+    };
+    const rita = () => {
+      const lista = alla.filter(t => region(t) === vald).slice(0, ANTAL_TRENDER);
+      ruta.innerHTML = `
+        ${flikar.length > 1 ? `<div class="flikar">${flikar.map(([k, n]) => `<button type="button" data-region="${k}" aria-pressed="${k === vald}">${n}</button>`).join("")}</div>` : ""}
+        ${lista.map(rad).join("")}`;
+      ruta.querySelectorAll("[data-region]").forEach(b => b.onclick = () => {
+        vald = b.dataset.region;
+        try { localStorage.setItem("trendregion", vald); } catch {}
+        rita();
+      });
+    };
+    rita();
   } catch (e) {
     ruta.innerHTML = `<span class="fel">Kunde inte hämta trender (${esc(e.message)}).</span>`;
+  }
+}
+
+// --- Polymarket ---
+
+// Gamma API (öppet, CORS tillåtet): händelser sorterade på handelsvolym senaste veckan.
+const POLYMARKET = "https://gamma-api.polymarket.com/events?order=volume1wk&ascending=false&limit=15&active=true&closed=false";
+const ANTAL_POLYMARKET = 5;
+const UTFALL = { Yes: "Ja", No: "Nej" };
+
+function sannolikhet(p) {
+  const procent = p * 100;
+  return procent < 1 ? "<1 %" : procent > 99 ? ">99 %" : `${Math.round(procent)} %`;
+}
+
+// Ledande utfall: för en ja/nej-fråga "Ja 62 %", annars de två alternativ som har högst sannolikhet.
+function polyLedare(e) {
+  const oppna = (e.markets || []).filter(m => !m.closed && m.active !== false && m.outcomePrices);
+  const pris = m => { try { return Number(JSON.parse(m.outcomePrices)[0]); } catch { return 0; } };
+  if (oppna.length === 1 && !oppna[0].groupItemTitle) {
+    const m = oppna[0];
+    const utfall = JSON.parse(m.outcomes || "[]"), priser = JSON.parse(m.outcomePrices || "[]").map(Number);
+    const i = priser.indexOf(Math.max(...priser));
+    return `${UTFALL[utfall[i]] || utfall[i]} ${sannolikhet(priser[i])}`;
+  }
+  return oppna.sort((a, b) => pris(b) - pris(a)).slice(0, 2)
+    .map(m => `${m.groupItemTitle || m.question} ${sannolikhet(pris(m))}`).join(" · ");
+}
+
+const dollar = v => v >= 1e6 ? `$${tal(v / 1e6, 1)} M` : `$${tal(v / 1e3, 0)} k`;
+
+async function visaPolymarket() {
+  const ruta = document.getElementById("polymarket-innehall");
+  try {
+    const svar = await fetch(POLYMARKET);
+    if (!svar.ok) throw new Error(`Polymarket svarade ${svar.status}`);
+    const handelser = (await svar.json())
+      .map(e => ({ ...e, ledare: polyLedare(e) }))
+      .filter(e => e.ledare)
+      .slice(0, ANTAL_POLYMARKET);
+    ruta.innerHTML = handelser.map(e => `
+      <div class="poly">
+        <a class="polytitel" href="https://polymarket.com/event/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${esc(e.title)}</a>
+        <span class="polyvolym" title="Handelsvolym senaste veckan">${dollar(e.volume1wk || 0)}</span>
+        <div class="polyledare">${esc(e.ledare)}</div>
+      </div>`).join("") || `<div class="info">Inga marknader just nu.</div>`;
+    visaTid("polymarket-tid", new Date().toISOString());
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta Polymarket (${esc(e.message)}).</span>`;
   }
 }
 
@@ -2327,6 +2416,7 @@ visaLunch();
 visaEvenemang();
 visaNyheter();
 visaTrender();
+visaPolymarket();
 visaPriser();
 visaSport();
 visaBors();
@@ -2340,6 +2430,7 @@ setInterval(() => {
   visaElpris();
   visaNyheter();
   visaTrender();
+  visaPolymarket();
   visaBors();
   visaSport();
   visaStyrranta();

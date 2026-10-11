@@ -18,12 +18,13 @@ Live: https://janne89.github.io/morgonkoll/
 | Sport: Sverigematcher, Allsvenskan, Superettan, PL, CL, EL, Ligue 1, Serie A, La Liga, Bundesliga, NHL | ESPN (inofficiellt API) | I webbläsaren | När sidan öppnas, var 15:e min, varannan minut under pågående matcher |
 | Sport: SHL | shl.se (inofficiellt API) | GitHub Actions → Supabase | Med nyheterna, var 15:e min (även helger) |
 | Evenemang i Stockholm: stora (med antal besökare) och idag/imorgon/helgen | [Visit Stockholm Open API](https://api.visitstockholm.com/documentation/) (CC BY 4.0) | GitHub Actions → Supabase | Morgnar, vardag och helg |
+| Mest spelat på Polymarket senaste veckan | [Polymarket](https://polymarket.com/) Gamma API (öppet) | I webbläsaren | När sidan öppnas och var 15:e min |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
 | Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
-| Trendar på Google (Sverige) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
+| Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
@@ -201,6 +202,18 @@ GitHub Actions (se schema ovan)
 - Pressmeddelanden: `riksbank.se/sv/rss/pressmeddelanden/`, filtrerat på styrränta/penningpolitik (de 3 senaste).
 - [fetch/sources/riksbanken.py](fetch/sources/riksbanken.py) → tabellen `riksbanken` (en rad). Fel i kalender eller
   RSS stoppar inte räntan; då behålls förra hämtningens värden.
+
+### Trender per region
+- Flikar Sverige, USA, Europa och Asien. Google Trends finns bara per land: Europa = GB, DE, FR, ES, IT och Asien =
+  IN, SG, PH (engelskspråkiga – japanska/koreanska trender och nyheter går inte att läsa), `REGIONER` i
+  [fetch/sources/trender.py](fetch/sources/trender.py). Flera länder slås ihop: 6 per land, samma sökord räknas en
+  gång (`nyckel()`), störst sökvolym först, 10 per region. Landskoden visas vid sökordet.
+- Tabellen `trender` har nyckeln (region, sokord); varje region ersätts för sig, så ett fel i en region rör inte de andra.
+
+### Polymarket
+- `https://gamma-api.polymarket.com/events?order=volume1wk&ascending=false&active=true&closed=false` – öppet, CORS
+  tillåtet. Kortet visar de 5 händelserna med störst handelsvolym senaste veckan och ledande utfall (marknadens pris
+  som sannolikhet). Rubrikerna är på engelska.
 
 ### Systembolaget – släpp
 - Inget öppet API finns längre (gamla `api-portal.systembolaget.se` är nedlagd). Vi använder samma sök-API

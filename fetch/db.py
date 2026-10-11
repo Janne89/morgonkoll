@@ -53,16 +53,17 @@ class Databas:
                                     "hamtad": datetime.now(timezone.utc).isoformat()}],
                     "restaurang,ar,vecka")
 
-    def ersatt_alla(self, tabell, rader, nyckel):
-        """Byter ut hela tabellens innehåll mot de nyss hämtade raderna.
+    def ersatt_alla(self, tabell, rader, nyckel, urval=None):
+        """Byter ut hela tabellens innehåll (eller bara raderna i urval) mot de nyss hämtade.
 
         Skriver först och raderar sedan det som inte kom med (äldre hamtad),
         så att ett fel inte lämnar tabellen tom. Alla rader ska ha samma hamtad.
+        urval: PostgREST-filter, t.ex. {"region": "eq.SE"}.
         """
         if not rader:
             return
         self.upsert(tabell, rader, nyckel)
-        self._anrop("DELETE", tabell, params={"hamtad": f"lt.{rader[0]['hamtad']}"})
+        self._anrop("DELETE", tabell, params={"hamtad": f"lt.{rader[0]['hamtad']}", **(urval or {})})
 
     def upsert(self, tabell, rader, nyckel):
         if rader:
