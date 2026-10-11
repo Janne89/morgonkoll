@@ -68,6 +68,7 @@
   .dagsinfo { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 14px; color: var(--dampad); }
   .dagsinfo:empty { display: none; }
   .dagsinfo .speciell { color: var(--accent); font-weight: 600; }
+  .dagsinfo .soltid .vaderikon { width: 16px; height: 17px; vertical-align: -3px; margin-right: 4px; }
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
@@ -1152,7 +1153,7 @@ function soltext() {
   const langd = Math.round((idag.ner - idag.upp) / 60e3);
   const skillnad = igar ? langd - Math.round((igar.ner - igar.upp) / 60e3) : 0;
   const tecken = skillnad > 0 ? `+${skillnad}` : skillnad < 0 ? `−${-skillnad}` : "±0";
-  return `☀ ${klocka(idag.upp)}–${klocka(idag.ner)} · ${Math.floor(langd / 60)} h ${langd % 60} min (${tecken} min)`;
+  return `${klocka(idag.upp)}–${klocka(idag.ner)} · ${Math.floor(langd / 60)} h ${langd % 60} min (${tecken} min)`;
 }
 
 // --- Vädervarningar (SMHI) ---
@@ -2294,9 +2295,9 @@ async function visaDagen() {
   const tema = TEMADAGAR[`${man}-${dag}`] || rorligaTemadagar(+ar)[`${man}-${dag}`];
   if (tema && !delar.some(([t]) => t.startsWith(tema.split(" ")[0]))) delar.push([tema, true]);
   const sol = soltext();
-  if (sol) delar.push([sol, false]);
 
-  ruta.innerHTML = delar.map(([t, speciell]) => `<span${speciell ? ' class="speciell"' : ""}>${esc(t)}</span>`).join("");
+  ruta.innerHTML = delar.map(([t, speciell]) => `<span${speciell ? ' class="speciell"' : ""}>${esc(t)}</span>`).join("")
+    + (sol ? `<span class="soltid" title="Soluppgång–solnedgång i Stockholm">${vaderikon(1)}${esc(sol)}</span>` : "");
 }
 
 // --- Start ---
