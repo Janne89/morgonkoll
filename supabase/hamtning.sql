@@ -61,6 +61,10 @@ revoke all on function privat.starta_hamtning() from public, anon, authenticated
 
 select cron.schedule('hamta', '*/15 * * * *', 'select privat.starta_hamtning()');
 
+-- pg_cron loggar varje körning och rensar aldrig själv. Behåll en vecka.
+select cron.schedule('rensa-cronlogg', '17 3 * * *',
+  $$delete from cron.job_run_details where end_time < now() - interval '7 days'$$);
+
 -- Felsökning: GitHub svarar 204 när körningen startats (svaren sparas ca 6 h).
 --   select created, status_code, content from net._http_response order by created desc limit 10;
 --   select start_time, status, return_message from cron.job_run_details order by start_time desc limit 10;

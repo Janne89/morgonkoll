@@ -14,7 +14,7 @@ och har en tidsstämpel i `#<id>-tid`.
 - **Live:** `https://janne89.github.io/morgonkoll/` – för "är något trasigt just nu?".
 - **Lokalt:** för ändringar som inte är pushade. Playwright blockerar `file://`, så starta en server
   i bakgrunden (`run_in_background`) från repots rot:
-  `python -m http.server 8765 --bind 127.0.0.1` och öppna `http://127.0.0.1:8765/`.
+  `python -m http.server 8765 --bind 127.0.0.1` och öppna `http://localhost:8765/` (Edge når inte servern via 127.0.0.1).
   Stoppa servern när du är klar.
 
 ## 2. Ladda och vänta

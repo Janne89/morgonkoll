@@ -105,6 +105,7 @@
   .kalla a { color: inherit; }
   .kalla .tid { opacity: 0.8; }
   .kalla .tid:not(:empty)::before { content: " · "; }
+  .kalla .tid.forsenad { color: var(--accent); opacity: 1; font-weight: 600; }
   .fel { color: var(--accent); }
 
   /* Väder */
@@ -213,6 +214,12 @@
   /* Elpris */
   #elpris .flikar { margin: -4px 0 6px; }
   #elpris .flikavdelare { width: 10px; }
+  /* Idag/Imorgon + SE1–SE4 ska rymmas på en rad även på 360 px breda telefoner. */
+  @media (max-width: 480px) {
+    #elpris .flikar { gap: 4px; }
+    #elpris .flikar button { font-size: 12px; padding: 2px 7px; }
+    #elpris .flikavdelare { width: 0; }
+  }
   .elnu { margin: 6px 0 2px; color: var(--dampad); font-size: 14px; }
   .elnu .varde { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
   .elnu .nar { margin-left: 6px; }
@@ -669,11 +676,26 @@ function symbol(kod, timme) {
 
 // Diskret "senast hämtad" i källraden på varje kort.
 const senaste = rader => rader.map(r => r.hamtad).filter(Boolean).sort().at(-1);
-function visaTid(id, iso, prefix = "") {
+function visaTid(id, iso, prefix = "", takt = null) {
   const el = document.getElementById(id);
   if (!el || !iso) return;
-  el.textContent = `${prefix} ${tidText(iso)}`.trim();
-  el.title = `${prefix ? "Prognosen gjord" : "Senast hämtad"} ${new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}`;
+  const sen = takt && forsenad(iso, takt);
+  el.classList.toggle("forsenad", !!sen);
+  el.textContent = sen ? `⚠ ej uppdaterad sedan ${tidText(iso)}` : `${prefix} ${tidText(iso)}`.trim();
+  el.title = `${sen ? "Hämtjobbet verkar ha stannat – senast hämtad" : prefix ? "Prognosen gjord" : "Senast hämtad"} ${new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}`;
+}
+
+// Data från hämtjobbet (Supabase pg_cron → GitHub Actions, se supabase/hamtning.sql) som är äldre än schemat tillåter.
+// "ofta": var 15:e min vardagar 06–22:45, helger 08–22:45 – varnar efter 60 min, bara när jobbet borde ha hunnit gå.
+// "morgon": varje morgon från 07:15 – efter 08 ska det finnas en hämtning från idag, före 08 från igår.
+function forsenad(iso, takt) {
+  const nu = new Date(), alder = (nu - new Date(iso)) / 36e5;   // timmar
+  const { timme, veckodag } = lokal(nu);
+  if (takt === "ofta") {
+    const helg = veckodag === "lördag" || veckodag === "söndag";
+    return timme >= (helg ? 9 : 7) && timme <= 22 && alder > 1;
+  }
+  return alder > (timme >= 8 ? timme - 6 : timme + 18);
 }
 
 // --- Väder ---
@@ -943,7 +965,7 @@ async function visaNyheter() {
   const ruta = document.getElementById("nyheter-innehall");
   try {
     const artiklar = await supabase("nyheter", "select=kalla,amne,rubrik,ingress,lank,publicerad,hamtad&order=publicerad.desc&limit=300");
-    visaTid("nyheter-tid", senaste(artiklar));
+    visaTid("nyheter-tid", senaste(artiklar), "", "ofta");
     if (!artiklar.length) { ruta.textContent = "Inga rubriker hämtade än."; return; }
     // En flik per ämne. AI-nyheter har en egen rad för källorna och visas inte under "Alla".
     const ai = a => a.amne === "ai";
@@ -1679,7 +1701,7 @@ async function visaEvenemang() {
   try {
     const idag = lokal(new Date()).datum;
     const rader = await supabase("evenemang", `select=*&slut=gte.${idag}&order=start`);
-    visaTid("evenemang-tid", senaste(rader));
+    visaTid("evenemang-tid", senaste(rader), "", "morgon");
     const stora = rader.filter(r => r.stort).slice(0, ANTAL_STORA);
     const korta = rader.filter(r => !r.stort);
     const dagar = evenemangsdagar();
@@ -1732,7 +1754,7 @@ async function visaTrender() {
   const ruta = document.getElementById("trender-innehall");
   try {
     const alla = await supabase("trender", "select=*&order=plats,trafik_tal.desc");
-    visaTid("trender-tid", senaste(alla));
+    visaTid("trender-tid", senaste(alla), "", "ofta");
     if (!alla.length) { ruta.textContent = "Inga trender hämtade än."; return; }
     const region = t => t.region || "SE";
     const flikar = TRENDREGIONER.filter(([k]) => alla.some(t => region(t) === k));
@@ -1837,7 +1859,7 @@ async function visaSystembolaget() {
     const idag = lokal(new Date()).datum;
     const imorgon = lokal(new Date(Date.now() + 864e5)).datum;
     const produkter = await supabase("systembolaget", `select=*&saljstart=gte.${idag}&order=saljstart,sortiment`);
-    visaTid("systembolaget-tid", senaste(produkter));
+    visaTid("systembolaget-tid", senaste(produkter), "", "morgon");
     if (!produkter.length) { ruta.textContent = "Inga släpp de närmaste veckorna."; return; }
 
     const slapp = new Map();
@@ -2043,7 +2065,7 @@ async function visaStyrranta() {
           ${rad.nyheter.map(n => `<a class="nyhet" href="${esc(n.lank)}" target="_blank" rel="noopener">
             <div class="meta">${esc(kortDatum(n.publicerad, true))}</div><div class="rubriktext">${esc(n.rubrik)}</div></a>`).join("")}
         </details>` : ""}`;
-    visaTid("styrranta-tid", rad.hamtad);
+    visaTid("styrranta-tid", rad.hamtad, "", "ofta");
   } catch (e) {
     ruta.innerHTML = `<span class="fel">Kunde inte hämta styrräntan (${esc(e.message)}).</span>`;
   }
@@ -2349,7 +2371,7 @@ async function visaBors() {
   const ruta = document.getElementById("bors-innehall");
   try {
     const rader = await supabase("bors", "select=*");
-    visaTid("bors-tid", senaste(rader));
+    visaTid("bors-tid", senaste(rader), "", "ofta");
     if (!rader.length) { ruta.textContent = "Inga kurser hämtade än."; return; }
     const ordning = ["^OMX", "^GSPC", "^IXIC", "^GDAXI", "BZ=F", "GC=F", "BTC-USD", "SEKUSDPMI", "SEKEURPMI"];
     // Enhet och antal decimaler för det som inte är index.

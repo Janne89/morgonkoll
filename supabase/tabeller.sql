@@ -177,3 +177,7 @@ create policy "alla får läsa" on evenemang  for select to anon, authenticated 
 
 grant select on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell, evenemang to anon, authenticated;
 grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell, evenemang to service_role;
+
+-- Supabases automatiska RLS (event trigger) ska inte gå att anropa via /rest/v1/rpc.
+-- Event triggers körs ändå – rättigheten kontrolleras inte då.
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
