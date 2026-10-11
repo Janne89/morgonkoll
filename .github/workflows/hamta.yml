@@ -7,8 +7,8 @@ on:
     - cron: "17 5-8 * * 1-5"
     # Nyheter + börs + Google Trends + Riksbanken (räntebesked 09:30): var 15:e minut på vardagar, ungefär 06–22 svensk tid (täcker USA-börsen).
     - cron: "*/15 4-20 * * 1-5"
-    # Nyheter + börs + Google Trends (bitcoin handlas även på helger): en gång i timmen på helger.
-    - cron: "0 6-20 * * 0,6"
+    # Samma på helger (bitcoin och SHL), var 15:e minut ungefär 07–22 svensk tid.
+    - cron: "*/15 6-20 * * 0,6"
   workflow_dispatch:
 
 # Kör aldrig två hämtningar samtidigt.
@@ -25,8 +25,8 @@ jobs:
         id: delar
         run: |
           case "${{ github.event.schedule }}" in
-            "*/15 4-20 * * 1-5") echo "delar=nyheter bors trender riksbanken" >> "$GITHUB_OUTPUT" ;;
-            "0 6-20 * * 0,6")    echo "delar=nyheter bors trender riksbanken" >> "$GITHUB_OUTPUT" ;;
+            "*/15 4-20 * * 1-5") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
+            "*/15 6-20 * * 0,6") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
             *)                   echo "delar=" >> "$GITHUB_OUTPUT" ;;  # lunchschemat och manuellt: allt
           esac
       - uses: actions/checkout@v5

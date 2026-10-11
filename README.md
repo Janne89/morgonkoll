@@ -15,6 +15,8 @@ Live: https://janne89.github.io/morgonkoll/
 | Störningar på SL-linjerna | [SL Deviations API](https://www.trafiklab.se/api/our-apis/sl/deviations/) | I webbläsaren | Med avgångarna, högst var 5:e min |
 | Soluppgång, solnedgång, dagslängd | Uträknat i webbläsaren (SunCalc-algoritmen) | – | – |
 | Dagens prisjämförelse (en vara per dag mot KPI) | [SCB](https://www.scb.se/) KPI per varugrupp | I webbläsaren | När sidan öppnas (SCB publicerar en gång i månaden) |
+| Sport: Sverigematcher, Allsvenskan, Superettan, PL, CL, EL, Ligue 1, Serie A, La Liga, Bundesliga, NHL | ESPN (inofficiellt API) | I webbläsaren | När sidan öppnas, var 15:e min, varannan minut under pågående matcher |
+| Sport: SHL | shl.se (inofficiellt API) | GitHub Actions → Supabase | Med nyheterna, var 15:e min (även helger) |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -38,14 +40,14 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 | Cron (UTC) | Svensk tid (ca) | Kör |
 |---|---|---|
-| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, Systembolaget) |
-| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken |
-| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs + trender + Riksbanken |
+| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget) |
+| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
+| `*/15 6-20 * * 0,6` | helger 07–21:45 vinter / 08–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
 | manuellt (Run workflow) | – | allt |
 
 - GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
 - Två körningar körs aldrig samtidigt (`concurrency`).
-- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken]` – utan argument körs allt.
+- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken] [shl]` – utan argument körs allt.
   Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
 - Varje körning raderar data äldre än 7 dagar (för att hålla sig inom Supabase gratisnivå).
 
@@ -54,7 +56,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 ```
 GitHub Pages (index.html)
    ├─ Väder (SMHI), elpris, SL-avgångar, namnsdag (Svenska dagar) och verktygens data: direkt i webbläsaren
-   └─ Lunch, nyheter, börs, trender, Riksbanken, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
+   └─ Lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
    └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
@@ -85,6 +87,18 @@ GitHub Actions (se schema ovan)
 ### Soltider
 - Räknas i webbläsaren för Stockholm (59,33 N, 18,07 E) med SunCalc-algoritmen; visas i sidhuvudet med dagslängd
   och skillnad mot i går.
+
+### Sport
+- **Fotboll och NHL** från ESPN:s inofficiella API (`site.api.espn.com/apis/site/v2/sports/...`, ingen nyckel, CORS
+  tillåtet). Fotboll hämtas med `soccer/all/scoreboard?dates=ÅÅÅÅMMDD&limit=1000` (alla ligor, ett anrop per dag) och
+  filtreras på liga-id i `SPORTLIGOR` (3945 Allsvenskan, 5362 Superettan, 700 PL, 775 CL, 776 EL, 710 Ligue 1, 730 Serie A,
+  740 La Liga, 720 Bundesliga). **Sverige** = alla matcher där ett lag heter "Sweden…" (herr, dam, U21 – alla turneringar);
+  turneringen tas från matchnotisen och översätts i `TURNERINGAR`. NHL: `hockey/nhl/scoreboard`.
+- **SHL** från shl.se:s eget API (`/api/sports-v2/game-schedule`, aktuell säsong via `season-series-game-types-filter`).
+  Tillåter inte CORS → [fetch/sources/shl.py](fetch/sources/shl.py) → tabellen `shl` (igår till en vecka framåt).
+- Saknas: Svenska cupen (inte hos ESPN) och hockeylandslaget.
+- Ligorna väljs med knappar i kortet (sparas i webbläsaren). Idag visas, gårdagens resultat ligger hopfällda.
+- ESPN:s CDN spärrar headless-webbläsare ("HeadlessChrome" i user agent) – vid test, sätt en vanlig `--user-agent`.
 
 ### Dagens prisjämförelse
 - SCB-tabellen `KPI2020COICOPM` (KPI per varugrupp, index 2020 = 100), de senaste 140 månaderna för varorna i

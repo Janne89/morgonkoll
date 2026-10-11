@@ -1,7 +1,7 @@
 """Hämtar källorna och skriver till Supabase.
 
     python main.py                 # allt
-    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender, riksbanken)
+    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender, riksbanken, shl)
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, lunch_battre, nyheter, riksbanken, systembolaget, trender
+from sources import bors, lunch_battre, nyheter, riksbanken, shl, systembolaget, trender
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -96,8 +96,21 @@ def styrranta(db):
         db.upsert("riksbanken", [rad], "id")
 
 
+def shlmatcher(db):
+    matcher = shl.hamta()
+    print(f"SHL: {len(matcher)} matcher")
+    for m in matcher[:12]:
+        resultat = f"{m['hemma_mal']}–{m['borta_mal']}" if m["hemma_mal"] is not None else ""
+        print(f"  {m['start'][:16]} {m['status']:9} {m['hemma']} – {m['borta']} {resultat}")
+    if db:
+        if matcher:
+            db.ersatt_alla("shl", matcher, "uuid")
+        else:
+            db._anrop("DELETE", "shl", params={"uuid": "not.is.null"})   # uppehåll – töm
+
+
 DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata,
-         "systembolaget": slapp, "trender": googletrender, "riksbanken": styrranta}
+         "systembolaget": slapp, "trender": googletrender, "riksbanken": styrranta, "shl": shlmatcher}
 
 
 def main(namn):

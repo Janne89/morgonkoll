@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #systembolaget { order: 9; } #verktyg { order: 10; }
+  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #systembolaget { order: 9; } #sport { order: 10; } #verktyg { order: 11; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -278,6 +278,21 @@
   .prisdiagram .slutetikett.dampad { fill: var(--dampad); font-weight: 400; }
   .prisavlasning { font-size: 13px; color: var(--dampad); min-height: 1.4em; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
+  /* Sport */
+  #sport .sportfilter { margin: -4px 0 8px; }
+  #sport .sportfilter button { font-size: 12px; padding: 2px 9px; }
+  .sportdag { font-weight: 600; margin-top: 4px; }
+  .sportliga { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dampad); margin: 10px 0 2px; }
+  .match { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--linje); font-size: 15px; }
+  .match:last-child { border-bottom: 0; }
+  .matchtid { font-size: 13px; color: var(--dampad); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .match.live .matchtid { color: var(--accent); font-weight: 600; }
+  .match.live .matchtid::before { content: "● "; }
+  .matchlag { min-width: 0; }
+  .matchlag .turnering { display: block; font-size: 12px; color: var(--dampad); }
+  .matchresultat { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #sport details.hela summary { margin-top: 10px; }
+
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
   .slapp:last-of-type { border-bottom: 0; }
@@ -315,6 +330,7 @@
     <a href="#sl">SL</a>
     <a href="#lunch">Lunch</a>
     <a href="#systembolaget">Systembolaget</a>
+    <a href="#sport">Sport</a>
   </nav>
 
   <div class="rutnat">
@@ -354,6 +370,12 @@
       <h2>Släpp · Systembolaget</h2>
       <div id="systembolaget-innehall">Hämtar släpp…</div>
       <div class="kalla">Källa: <a href="https://www.systembolaget.se/">Systembolaget</a> (inofficiellt) · säljstart kl 10<span class="tid" id="systembolaget-tid"></span></div>
+    </section>
+
+    <section class="kort" id="sport">
+      <h2>Sport</h2>
+      <div id="sport-innehall">Hämtar matcher…</div>
+      <div class="kalla">Källor: ESPN (fotboll, NHL), <a href="https://www.shl.se/">shl.se</a> (SHL) – inofficiella<span class="tid" id="sport-tid"></span></div>
     </section>
     </div>
 
@@ -1238,6 +1260,139 @@ async function visaPriser(steg = 0) {
   }
 }
 
+// --- Sport ---
+
+// Fotboll och NHL från ESPN:s öppna (inofficiella) API, SHL via Supabase (shl.se tillåter inte CORS).
+// Nyckeln är ESPN:s liga-id för fotboll; "sverige" = alla landskamper där ett svenskt lag spelar.
+const SPORTLIGOR = [
+  ["sverige", "Sverige"], ["3945", "Allsvenskan"], ["5362", "Superettan"], ["700", "Premier League"],
+  ["775", "Champions League"], ["776", "Europa League"], ["710", "Ligue 1"], ["730", "Serie A"],
+  ["740", "La Liga"], ["720", "Bundesliga"], ["shl", "SHL"], ["nhl", "NHL"],
+];
+const ESPN = "https://site.api.espn.com/apis/site/v2/sports";
+const SVENSKT_LANDSLAG = /^Sweden\b/;
+let sportUppdatering = null;
+
+const espnDatum = d => d.replaceAll("-", "");
+async function espn(vag, datum) {
+  const svar = await fetch(`${ESPN}/${vag}/scoreboard?dates=${espnDatum(datum)}&limit=1000`);
+  if (!svar.ok) throw new Error(`ESPN svarade ${svar.status}`);
+  return (await svar.json()).events || [];
+}
+
+// ESPN:s matchnotis, t.ex. "UEFA Nations League, Group B4" → "Nations League, grupp B4".
+const TURNERINGAR = [
+  [/^WWCQ\b.*/, "VM-kval (dam)"], [/^WCQ\b.*/, "VM-kval"], [/^Women'?s? EURO Qualifying/i, "EM-kval (dam)"],
+  [/^EURO U-?21 Qualifying/i, "U21-EM-kval"], [/^EURO Qualifying/i, "EM-kval"], [/^UEFA Women'?s Nations League/i, "Nations League (dam)"],
+  [/^UEFA Nations League/i, "Nations League"], [/International Friendly/i, "Träningslandskamp"],
+];
+function turneringsnamn(notis = "") {
+  const [namn, ...rest] = notis.split(", ");
+  const svenskt = TURNERINGAR.reduce((t, [monster, ersattning]) => monster.test(t) ? ersattning : t, namn);
+  return [svenskt, ...rest.map(r => r.replace(/^Group /, "grupp ").replace(/^Playoff.*/i, "playoff"))].join(", ");
+}
+
+function espnMatch(e, liga) {
+  const c = e.competitions?.[0] || {};
+  const lag = sida => c.competitors?.find(t => t.homeAway === sida) || {};
+  const hemma = lag("home"), borta = lag("away");
+  const typ = e.status?.type || {};
+  const namn = t => (t.team?.shortDisplayName || t.team?.displayName || "").replace(/^Sweden/, "Sverige");
+  return {
+    liga, start: new Date(e.date), status: typ.state,          // pre, in, post
+    detalj: typ.shortDetail || "", klar: typ.completed,
+    hemma: namn(hemma), borta: namn(borta),
+    hemmaMal: hemma.score, bortaMal: borta.score,
+    turnering: liga === "sverige" ? turneringsnamn(c.altGameNote || c.series?.title || "") : "",
+  };
+}
+
+function shlMatch(m) {
+  return {
+    liga: "shl", start: new Date(m.start),
+    status: m.status === "post-game" ? "post" : m.status === "pre-game" ? "pre" : "in",
+    detalj: m.status === "post-game" ? (m.straffar ? "Final/SO" : m.overtime ? "Final/OT" : "Final") : m.status,
+    klar: m.status === "post-game", hemma: m.hemma, borta: m.borta, hemmaMal: m.hemma_mal, bortaMal: m.borta_mal,
+  };
+}
+
+// Status på svenska: tid före match, minut/period under, "Slut" efter.
+function matchstatus(m) {
+  if (m.status === "pre") return /postponed|canceled|cancelled/i.test(m.detalj) ? "Inställd" : klocka(m.start);
+  if (m.status === "post") {
+    if (/postponed|canceled|cancelled|abandoned/i.test(m.detalj)) return "Inställd";
+    return /SO|Pen/i.test(m.detalj) ? "Slut (str.)" : /OT|AET/i.test(m.detalj) ? "Slut (förl.)" : "Slut";
+  }
+  return m.detalj.replace(/^HT$/, "Paus").replace(/End of /, "Efter ").replace(/(\d)(st|nd|rd|th)\b/, "P$1") || "Pågår";
+}
+
+function matchrad(m) {
+  const resultat = m.status === "pre" || m.hemmaMal == null ? "" : `${m.hemmaMal}–${m.bortaMal}`;
+  return `<div class="match ${m.status === "in" ? "live" : ""}">
+    <span class="matchtid">${esc(matchstatus(m))}</span>
+    <span class="matchlag">${esc(m.hemma)} – ${esc(m.borta)}${m.turnering ? `<span class="turnering">${esc(m.turnering)}</span>` : ""}</span>
+    <span class="matchresultat">${esc(resultat)}</span>
+  </div>`;
+}
+
+function matchlista(matcher, valda) {
+  return SPORTLIGOR.filter(([k]) => valda.has(k)).map(([k, namn]) => {
+    const lista = matcher.filter(m => m.liga === k).sort((a, b) => a.start - b.start);
+    return lista.length ? `<div class="sportliga">${esc(namn)}</div>${lista.map(matchrad).join("")}` : "";
+  }).join("");
+}
+
+async function visaSport() {
+  const ruta = document.getElementById("sport-innehall");
+  clearTimeout(sportUppdatering);
+  let valda = new Set(SPORTLIGOR.map(([k]) => k));
+  try { const s = JSON.parse(localStorage.getItem("sportligor") || "null"); if (Array.isArray(s)) valda = new Set(s); } catch {}
+
+  const idag = lokal(new Date()).datum, igar = lokal(new Date(Date.now() - 864e5)).datum;
+  const fotbollsligor = new Set(SPORTLIGOR.map(([k]) => k).filter(k => /^\d+$/.test(k)));
+  const [fotboll, nhl, shl] = await Promise.allSettled([
+    Promise.all([espn("soccer/all", igar), espn("soccer/all", idag)]).then(d => d.flat()),
+    Promise.all([espn("hockey/nhl", igar), espn("hockey/nhl", idag)]).then(d => d.flat()),
+    supabase("shl", "select=*&order=start"),
+  ]);
+  const matcher = [];
+  if (fotboll.status === "fulfilled") {
+    for (const e of fotboll.value) {
+      const liga = e.uid?.match(/~l:(\d+)/)?.[1];
+      const lag = (e.competitions?.[0]?.competitors || []).map(t => t.team?.displayName || "");
+      if (lag.some(n => SVENSKT_LANDSLAG.test(n))) matcher.push(espnMatch(e, "sverige"));
+      else if (fotbollsligor.has(liga)) matcher.push(espnMatch(e, liga));
+    }
+  }
+  if (nhl.status === "fulfilled") matcher.push(...nhl.value.map(e => espnMatch(e, "nhl")));
+  if (shl.status === "fulfilled") matcher.push(...shl.value.map(shlMatch));
+  const unika = [...new Map(matcher.map(m => [`${m.liga}|${m.hemma}|${m.borta}|${+m.start}`, m])).values()];
+  const dagens = unika.filter(m => lokal(m.start).datum === idag), gardagens = unika.filter(m => lokal(m.start).datum === igar);
+  const fel = [fotboll, nhl, shl].filter(r => r.status === "rejected").map(r => r.reason.message);
+
+  const rita = () => {
+    const idagHtml = matchlista(dagens, valda), igarHtml = matchlista(gardagens, valda);
+    const antalIgar = gardagens.filter(m => valda.has(m.liga)).length;
+    ruta.innerHTML = `
+      <div class="flikar sportfilter">${SPORTLIGOR.map(([k, n]) => `<button type="button" data-liga="${k}" aria-pressed="${valda.has(k)}">${esc(n)}</button>`).join("")}</div>
+      <div class="sportdag">Idag</div>
+      ${idagHtml || `<div class="info">Inga matcher idag i de valda ligorna.</div>`}
+      ${antalIgar ? `<details class="hela"><summary>Igår (${antalIgar} ${antalIgar === 1 ? "match" : "matcher"})</summary>${igarHtml}</details>` : ""}
+      ${fel.length ? `<div class="info">Kunde inte hämta allt (${esc(fel.join(", "))}).</div>` : ""}`;
+    ruta.querySelectorAll("[data-liga]").forEach(b => b.onclick = () => {
+      valda.has(b.dataset.liga) ? valda.delete(b.dataset.liga) : valda.add(b.dataset.liga);
+      try { localStorage.setItem("sportligor", JSON.stringify([...valda])); } catch {}
+      rita();
+    });
+  };
+  rita();
+  visaTid("sport-tid", new Date().toISOString());
+  // Pågående matcher: uppdatera varannan minut medan fliken syns.
+  if (dagens.some(m => m.status === "in")) {
+    sportUppdatering = setTimeout(() => { if (document.visibilityState === "visible") visaSport(); }, 2 * 60e3);
+  }
+}
+
 // --- Google Trends ---
 
 const ANTAL_TRENDER = 10;
@@ -1902,6 +2057,7 @@ visaLunch();
 visaNyheter();
 visaTrender();
 visaPriser();
+visaSport();
 visaBors();
 visaSystembolaget();
 
@@ -1914,6 +2070,7 @@ setInterval(() => {
   visaNyheter();
   visaTrender();
   visaBors();
+  visaSport();
   visaStyrranta();
 }, 15 * 60e3);
 
