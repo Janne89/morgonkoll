@@ -18,6 +18,12 @@
     --markering: #fbeee6;
     --upp: #1a7f45;
     --ned: #c0352b;
+    --sol: #f2b01e;
+    --moln: #f1f3f6;
+    --moln-kant: #98a1ae;
+    --moln-mork: #c5ccd6;
+    --mane: #a3b2cf;
+    --sno: #7fb2e5;
     --tag: #c2457f;
     --buss: #c0352b;
     --sparvag: #7a6a58;
@@ -36,6 +42,12 @@
       --markering: #3a2a22;
       --upp: #4cc27e;
       --ned: #f07167;
+      --sol: #f5bd3a;
+      --moln: #9aa2af;
+      --moln-kant: #d0d5dc;
+      --moln-mork: #6a7280;
+      --mane: #d8deea;
+      --sno: #b3d4f5;
       --tag: #b33d74;
       --buss: #b8352d;
       --sparvag: #7d6e5d;
@@ -99,6 +111,19 @@
   .nu .symbol { font-size: 44px; line-height: 1; }
   .nu .grader { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; }
   .nu .beskr { color: var(--dampad); font-size: 14px; }
+  /* Väderikoner */
+  .vi-sol circle { fill: var(--sol); }
+  .vi-stralar line { stroke: var(--sol); stroke-width: 3; stroke-linecap: round; }
+  .vi-mane { fill: var(--mane); }
+  .vi-moln { fill: var(--moln); stroke: var(--moln-kant); stroke-width: 2; stroke-linejoin: round; }
+  .vi-moln.mork { fill: var(--moln-mork); }
+  .vi-regn { stroke: var(--regn); stroke-width: 3; stroke-linecap: round; }
+  .vi-sno { fill: var(--sno); }
+  .vi-blixt { fill: var(--sol); }
+  .vi-dimma line { stroke: var(--moln-kant); stroke-width: 4; stroke-linecap: round; }
+  .nu .symbol .vaderikon { width: 64px; height: 70px; display: block; }
+  .dagar .symbol .vaderikon { width: 36px; height: 39px; display: block; margin: 0 auto; }
+  .paraply .vaderikon { width: 20px; height: 20px; vertical-align: -5px; margin-right: 5px; }
   .paraply { font-size: 14px; color: var(--dampad); margin: -2px 0 10px; }
   .paraply.ja { color: var(--text); font-weight: 600; }
   svg.diagram { width: 100%; height: auto; display: block; overflow: visible; }
@@ -580,10 +605,44 @@ const SYMBOLER = {
   22: ["🌨️", "Lätt snöblandat regn"], 23: ["🌨️", "Snöblandat regn"], 24: ["🌨️", "Kraftigt snöblandat regn"],
   25: ["❄️", "Lätt snöfall"], 26: ["❄️", "Snöfall"], 27: ["❄️", "Kraftigt snöfall"],
 };
+// Väderikoner som SVG (emoji ser olika ut på olika system – Windows 10 ritar dem svartkonturerade).
+// Wsymb2: 1–2 klart, 3–5 moln med sol, 6 mulet, 7 dimma, 8–10 regnskurar, 11 åskskurar, 12–14 byar av snöblandat,
+// 15–17 snöbyar, 18–20 regn, 21 åska, 22–24 snöblandat, 25–27 snöfall.
+function vaderikon(kod, natt = false) {
+  const stralar = (cx, cy, r1, r2) => Array.from({ length: 8 }, (_, i) => {
+    const v = i * Math.PI / 4, c = Math.cos(v), s = Math.sin(v);
+    return `<line x1="${(cx + c * r1).toFixed(1)}" y1="${(cy + s * r1).toFixed(1)}" x2="${(cx + c * r2).toFixed(1)}" y2="${(cy + s * r2).toFixed(1)}"/>`;
+  }).join("");
+  const sol = (cx, cy, r) => `<g class="vi-sol"><circle cx="${cx}" cy="${cy}" r="${r}"/><g class="vi-stralar">${stralar(cx, cy, r + 4, r + 9)}</g></g>`;
+  const mane = (cx, cy, r) => `<path class="vi-mane" d="M${cx + r * 0.3},${cy - r} A${r},${r} 0 1 0 ${cx + r},${cy + r * 0.35} A${r * 0.8},${r * 0.8} 0 0 1 ${cx + r * 0.3},${cy - r} Z"/>`;
+  const himlakropp = (cx, cy, r) => natt ? mane(cx, cy, r) : sol(cx, cy, r);
+  const moln = (mork, dy = 0) => `<path class="vi-moln${mork ? " mork" : ""}" transform="translate(0 ${dy})" d="M19 47 H45 A9.5 9.5 0 0 0 46 28 A13 13 0 0 0 21.5 25.5 A11 11 0 0 0 19 47 Z"/>`;
+  const droppar = n => [[24, 52], [33, 54], [42, 52]].slice(0, n).map(([x, y]) => `<line class="vi-regn" x1="${x}" y1="${y}" x2="${x - 3}" y2="${y + 8}"/>`).join("");
+  const flingor = n => [[24, 56], [34, 58], [44, 56]].slice(0, n).map(([x, y]) => `<circle class="vi-sno" cx="${x}" cy="${y}" r="2.6"/>`).join("");
+  const blixt = `<path class="vi-blixt" d="M33 44 L25 57 H32 L28 64 L40 50 H33 L37 44 Z"/>`;
+  const styrka = k => (k - 1) % 3 + 1;     // 1 lätt, 2 måttlig, 3 kraftig inom varje grupp om tre
+
+  let delar;
+  if (kod === 1) delar = natt ? mane(32, 32, 14) : sol(32, 32, 13);
+  else if (kod === 2) delar = himlakropp(26, 24, 11) + `<g transform="translate(14 14) scale(0.7)">${moln(false)}</g>`;
+  else if (kod >= 3 && kod <= 5) delar = himlakropp(24, 22, 10) + moln(false, 2);
+  else if (kod === 6) delar = moln(true, 2);
+  else if (kod === 7) delar = `<g class="vi-dimma"><line x1="14" y1="26" x2="50" y2="26"/><line x1="10" y1="35" x2="54" y2="35"/><line x1="16" y1="44" x2="48" y2="44"/></g>`;
+  else if (kod >= 8 && kod <= 10) delar = himlakropp(24, 18, 9) + moln(kod === 10, -4) + droppar(styrka(kod - 7));
+  else if (kod === 11) delar = himlakropp(24, 18, 9) + moln(true, -4) + blixt;
+  else if (kod >= 12 && kod <= 14) delar = himlakropp(24, 18, 9) + moln(kod === 14, -4) + droppar(1) + `<circle class="vi-sno" cx="40" cy="57" r="2.6"/>`;
+  else if (kod >= 15 && kod <= 17) delar = himlakropp(24, 18, 9) + moln(kod === 17, -4) + flingor(styrka(kod - 14));
+  else if (kod >= 18 && kod <= 20) delar = moln(kod === 20, -4) + droppar(styrka(kod - 17));
+  else if (kod === 21) delar = moln(true, -4) + blixt;
+  else if (kod >= 22 && kod <= 24) delar = moln(kod === 24, -4) + droppar(1) + `<circle class="vi-sno" cx="40" cy="57" r="2.6"/>`;
+  else if (kod >= 25 && kod <= 27) delar = moln(kod === 27, -4) + flingor(styrka(kod - 24));
+  else delar = moln(false);
+  return `<svg class="vaderikon" viewBox="4 3 56 61" aria-hidden="true">${delar}</svg>`;
+}
+
 function symbol(kod, timme) {
-  const [emoji, text] = SYMBOLER[kod] || ["·", ""];
-  const natt = timme < 6 || timme >= 20;
-  return [natt && kod <= 2 ? "🌙" : emoji, text];
+  const [, text] = SYMBOLER[kod] || ["", ""];
+  return [vaderikon(kod, timme < 6 || timme >= 20), text];
 }
 
 // Diskret "senast hämtad" i källraden på varje kort.
@@ -613,14 +672,14 @@ function paraply(timmar) {
   const kanske = t => risk(t) >= 30;
   const forsta = period.find(blott) || period.find(kanske);
   const nar = imorgon ? "imorgon" : "idag";
-  if (!forsta) return `<div class="paraply">☀ Inget paraply behövs ${nar}${imorgon ? "" : " (fram till kl 19)"}</div>`;
+  if (!forsta) return `<div class="paraply">${vaderikon(1)}Inget paraply behövs ${nar}${imorgon ? "" : " (fram till kl 19)"}</div>`;
   const maxRisk = Math.max(...period.map(risk));
   const sno = forsta.air_temperature <= 0.5;
   const klocka = lokal(forsta.tid).timme;
   const nuRegn = !imorgon && forsta === period[0];
-  const tid = nuRegn ? (sno ? "snöar nu" : "regnar nu") : `${sno ? "snö" : "regn"} ${imorgon ? "imorgon " : ""}från kl ${String(klocka).padStart(2, "0")}`;
-  if (!blott(forsta)) return `<div class="paraply">🌂 Kanske paraply – risk för ${nuRegn ? (sno ? "snö nu" : "regn nu") : tid} (${maxRisk} %)</div>`;
-  return `<div class="paraply ja">${sno ? "❄ Klä dig för snö" : "☂ Ta paraply"} – ${tid} (upp till ${maxRisk} %)</div>`;
+  const tid = nuRegn ? `${sno ? "snö" : "regn"} nu eller snart` : `${sno ? "snö" : "regn"} ${imorgon ? "imorgon " : ""}från kl ${String(klocka).padStart(2, "0")}`;
+  if (!blott(forsta)) return `<div class="paraply">${vaderikon(sno ? 15 : 8)}Kanske paraply – risk för ${tid} (${maxRisk} %)</div>`;
+  return `<div class="paraply ja">${vaderikon(sno ? 26 : 19)}${sno ? "Klä dig för snö" : "Ta paraply"} – ${tid} (upp till ${maxRisk} %)</div>`;
 }
 
 async function visaVader() {
@@ -684,7 +743,7 @@ function diagram(timmar) {
       delar += `<rect x="${(x(i) - steg * 0.32).toFixed(1)}" y="${(regnBotten - h).toFixed(1)}" width="${(steg * 0.64).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--regn)" opacity="${opacitet.toFixed(2)}"><title>${mm} mm, ${t.probability_of_precipitation}% risk</title></rect>`;
     }
     if (varannan) {
-      delar += `<text x="${x(i)}" y="22" text-anchor="middle" font-size="22" class="emoji" style="fill:initial">${symbol(t.symbol_code, timme)[0]}</text>`;
+      delar += symbol(t.symbol_code, timme)[0].replace('<svg class="vaderikon"', `<svg class="vaderikon" x="${(x(i) - 14).toFixed(1)}" y="-4" width="28" height="30"`);
       delar += `<text class="tempetikett" x="${x(i)}" y="${(y(t.air_temperature) - 8).toFixed(1)}" text-anchor="middle">${Math.round(t.air_temperature)}°</text>`;
       delar += `<text x="${x(i)}" y="${regnBotten + 18}" text-anchor="middle">${String(timme).padStart(2, "0")}</text>`;
     }
