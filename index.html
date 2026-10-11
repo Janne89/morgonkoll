@@ -160,6 +160,7 @@
   .nyhet:hover .rubriktext { text-decoration: underline; }
   .nyhet .meta { font-size: 12px; color: var(--dampad); }
   .nyhet .kalla-etikett { font-weight: 600; color: var(--accent); margin-right: 6px; }
+  .nyhet .konto { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid var(--linje); border-radius: 4px; padding: 0 4px; margin-right: 6px; }
   .nyhet .rubriktext { font-weight: 600; }
   .nyhet .ingress { font-size: 14px; color: var(--dampad); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .flikar { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 6px; }
@@ -413,7 +414,7 @@
     <section class="kort" id="nyheter">
       <h2>Nyheter</h2>
       <div id="nyheter-innehall">Hämtar rubriker…</div>
-      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT</a>, <a href="https://www.sverigesradio.se/ekot">Ekot</a>, <a href="https://www.dn.se/sthlm/">DN Sthlm</a>, <a href="https://www.bbc.com/news/world">BBC</a>, <a href="https://www.di.se/">Di</a> · AI: OpenAI, Anthropic, Google, TechCrunch, The Verge<span class="tid" id="nyheter-tid"></span></div>
+      <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT</a>, <a href="https://www.sverigesradio.se/ekot">Ekot</a>, <a href="https://www.dn.se/sthlm/">DN Sthlm</a>, <a href="https://www.bbc.com/news">BBC</a>, <a href="https://www.realtid.se/">Realtid</a>, <a href="https://www.di.se/">Di</a> (konto) · AI: OpenAI, Anthropic, Google, TechCrunch, The Verge<span class="tid" id="nyheter-tid"></span></div>
     </section>
 
     <section class="kort" id="trender">
@@ -879,6 +880,22 @@ async function visaLunch() {
 
 const ANTAL_NYHETER = 10;
 // Ämne i tabellen → flik. Källorna per ämne står i FLODEN i fetch/sources/nyheter.py.
+const KRAVER_KONTO = new Set(["Di"]);
+const MAX_PER_KALLA = 4;     // så att en källa som publicerar ofta (Di) inte tar över en flik
+
+// De n senaste, med högst max per källa – räcker de inte fylls det på med resten i tidsordning.
+function blandat(lista, n, max) {
+  const valda = [], per = {};
+  for (const a of lista) {
+    if (valda.length === n) break;
+    if ((per[a.kalla] = (per[a.kalla] || 0) + 1) <= max) valda.push(a);
+  }
+  for (const a of lista) {
+    if (valda.length === n) break;
+    if (!valda.includes(a)) valda.push(a);
+  }
+  return valda.sort((a, b) => b.publicerad.localeCompare(a.publicerad));
+}     // källor med betalvägg – märks i listan
 const NYHETSAMNEN = [["sverige", "Sverige"], ["stockholm", "Stockholm"], ["varlden", "Världen"], ["ekonomi", "Ekonomi"], ["ai", "AI"]];
 // Bolagen först, sedan media, i AI-flikens källrad.
 const AI_ORDNING = ["OpenAI", "Anthropic", "Google", "TechCrunch", "The Verge"];
@@ -909,17 +926,17 @@ async function visaNyheter() {
     const knappar = (lista, aktiv, attr, text = k => k) => `<div class="flikar">${lista.map(k => `<button type="button" ${attr}="${esc(k)}" aria-pressed="${k === aktiv}">${esc(text(k))}</button>`).join("")}</div>`;
 
     const rita = () => {
-      const urval = artiklar.filter(a =>
+      const urval = blandat(artiklar.filter(a =>
         vald === "alla" ? !ai(a) :
         vald === "ai" ? ai(a) && (valdAi === "Alla" || a.kalla === valdAi) :
         a.amne === vald
-      ).slice(0, ANTAL_NYHETER);
+      ), ANTAL_NYHETER, MAX_PER_KALLA);
       ruta.innerHTML = `
         ${knappar(flikar, vald, "data-amne", k => k === "alla" ? "Alla" : namn[k])}
         ${vald === "ai" ? knappar(aiKallor, valdAi, "data-aikalla") : ""}
         ${urval.map((a, i) => `
           <a class="nyhet" href="${esc(a.lank)}" target="_blank" rel="noopener">
-            <div class="meta"><span class="kalla-etikett">${esc(a.kalla)}</span>${tidText(a.publicerad)}</div>
+            <div class="meta"><span class="kalla-etikett">${esc(a.kalla)}</span>${KRAVER_KONTO.has(a.kalla) ? `<span class="konto" title="Kräver konto/prenumeration">konto</span>` : ""}${tidText(a.publicerad)}</div>
             <div class="rubriktext">${esc(a.rubrik)}</div>
             ${i < 3 && a.ingress ? `<div class="ingress">${esc(a.ingress)}</div>` : ""}
           </a>`).join("")}`;

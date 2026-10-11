@@ -23,7 +23,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
-| Nyheter | RSS/Atom per ämne: Sverige (SVT inrikes, Ekot), Stockholm (SVT Stockholm, DN Sthlm), Världen (SVT utrikes, BBC), Ekonomi (Di), AI (OpenAI, Anthropic, Google, TechCrunch, The Verge) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Nyheter | RSS/Atom per ämne: Sverige (SVT inrikes, Ekot), Stockholm (SVT Stockholm, DN Sthlm), Världen (SVT utrikes, BBC), Ekonomi (SVT Ekonomi, Realtid, BBC Business, Di), AI (OpenAI, Anthropic, Google, TechCrunch, The Verge) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
 | Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
@@ -168,11 +168,12 @@ GitHub Actions (se schema ovan)
 
 ### Nyheter
 - En flik per ämne (`amne` i tabellen, `NYHETSAMNEN` i [index.html](index.html)): Sverige, Stockholm, Världen, Ekonomi
-  och AI. "Alla" visar allt utom AI. Bara källor utan betalvägg. Ett trasigt flöde hoppas över, resten kommer med.
+  och AI. "Alla" visar allt utom AI. Fria källor, utom Di som märks "konto" (`KRAVER_KONTO`).
+  Högst 4 rubriker per källa i en flik (`MAX_PER_KALLA`), annars tar Di över – fylls på om det inte räcker. Ett trasigt flöde hoppas över, resten kommer med.
   - Sverige: `svt.se/nyheter/inrikes/rss.xml`, Ekot `api.sr.se/api/rss/program/83` (Atom)
   - Stockholm: `svt.se/nyheter/lokalt/stockholm/rss.xml`, `dn.se/sthlm/rss/`
   - Världen: `svt.se/nyheter/utrikes/rss.xml`, `feeds.bbci.co.uk/news/world/rss.xml`
-  - Ekonomi: `di.se/rss`
+  - Ekonomi: `svt.se/nyheter/ekonomi/rss.xml`, `realtid.se/feed/`, `feeds.bbci.co.uk/news/business/rss.xml`, `di.se/rss`
 - AI-fliken (kolumnen `amne = 'ai'`, visas inte under "Alla"):
   - OpenAI: `openai.com/news/rss.xml`. Poster utan kategori (kundcase) hoppas över.
   - Anthropic har inget eget flöde. Vi använder ett som skrapas av community-projektet

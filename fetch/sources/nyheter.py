@@ -9,7 +9,7 @@ from html import unescape
 import requests
 
 # (källa, url, ämne). Ämnet blir flik på sidan; "ai" visas inte under "Alla".
-# Bara källor utan betalvägg (DN Sthlm har mest öppna lokalnyheter).
+# Källor utan betalvägg, förutom Di (märks "konto" på sidan för dem som har ett).
 FLODEN = [
     ("SVT", "https://www.svt.se/nyheter/inrikes/rss.xml", "sverige"),
     ("Ekot", "https://api.sr.se/api/rss/program/83", "sverige"),
@@ -17,6 +17,9 @@ FLODEN = [
     ("DN", "https://www.dn.se/sthlm/rss/", "stockholm"),
     ("SVT", "https://www.svt.se/nyheter/utrikes/rss.xml", "varlden"),
     ("BBC", "https://feeds.bbci.co.uk/news/world/rss.xml", "varlden"),
+    ("SVT", "https://www.svt.se/nyheter/ekonomi/rss.xml", "ekonomi"),
+    ("Realtid", "https://www.realtid.se/feed/", "ekonomi"),
+    ("BBC", "https://feeds.bbci.co.uk/news/business/rss.xml", "ekonomi"),
     ("Di", "https://www.di.se/rss", "ekonomi"),
     ("OpenAI", "https://openai.com/news/rss.xml", "ai"),
     # Anthropic har inget eget flöde – det här skrapas av ett community-projekt på GitHub.
