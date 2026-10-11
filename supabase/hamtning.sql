@@ -18,6 +18,7 @@ revoke all on schema privat from public, anon, authenticated;
 create or replace function privat.starta_hamtning()
 returns void
 language plpgsql
+set search_path = ''
 as $$
 declare
   nu     timestamp := now() at time zone 'Europe/Stockholm';

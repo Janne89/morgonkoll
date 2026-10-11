@@ -21,9 +21,9 @@ Live: https://janne89.github.io/morgonkoll/
 | Mest spelat på Polymarket senaste veckan | [Polymarket](https://polymarket.com/) Gamma API (öppet) | I webbläsaren | När sidan öppnas och var 15:e min |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
-| Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
+| Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min, vardagar 06–22:45, helger 08–22:45 |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
-| Nyheter | RSS/Atom per ämne: Sverige (SVT inrikes, Ekot), Stockholm (SVT Stockholm, DN Sthlm), Världen (SVT utrikes, BBC), Ekonomi (SVT Ekonomi, Realtid, BBC Business, Di), AI (OpenAI, Anthropic, Google, TechCrunch, The Verge) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Nyheter | RSS/Atom per ämne: Sverige (SVT inrikes, Ekot), Stockholm (SVT Stockholm, DN Sthlm), Världen (SVT utrikes, BBC), Ekonomi (SVT Ekonomi, Realtid, BBC Business, Di), AI (OpenAI, Anthropic, Google, TechCrunch, The Verge) | GitHub Actions → Supabase | Var 15:e min, vardagar 06–22:45, helger 08–22:45 |
 | Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
