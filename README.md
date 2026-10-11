@@ -97,7 +97,10 @@ GitHub Actions (se schema ovan)
 - **SHL** från shl.se:s eget API (`/api/sports-v2/game-schedule`, aktuell säsong via `season-series-game-types-filter`).
   Tillåter inte CORS → [fetch/sources/shl.py](fetch/sources/shl.py) → tabellen `shl` (igår till en vecka framåt).
 - Saknas: Svenska cupen (inte hos ESPN) och hockeylandslaget.
-- Ligorna väljs med knappar i kortet (sparas i webbläsaren). Idag visas, gårdagens resultat ligger hopfällda.
+- Ligorna väljs med knappar i kortet (sparas i webbläsaren; förval Sverige och Allsvenskan, `SPORTFORVAL`).
+  Idag visas, gårdagens resultat ligger hopfällda.
+- **Tabell** (hopfälld, liga väljs i en meny): ESPN `apis/v2/sports/<sport>/<liga>/standings` för fotboll och NHL
+  (NHL per konferens), SHL från `statistics-v2/league-standings` → tabellen `shl_tabell`. Hämtas när den öppnas.
 - ESPN:s CDN spärrar headless-webbläsare ("HeadlessChrome" i user agent) – vid test, sätt en vanlig `--user-agent`.
 
 ### Dagens prisjämförelse

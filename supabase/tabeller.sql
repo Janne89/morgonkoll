@@ -110,6 +110,18 @@ create table if not exists shl (
   hamtad    timestamptz not null default now()
 );
 
+-- SHL-tabellen. Ersätts helt vid varje hämtning.
+create table if not exists shl_tabell (
+  plats     int primary key,
+  lag       text not null,
+  matcher   int not null,
+  vinster   int not null,
+  forluster int not null,
+  mal_diff  int not null,
+  poang     int not null,
+  hamtad    timestamptz not null default now()
+);
+
 -- RLS: alla (anon) får läsa, ingen får skriva. Hämtningen använder den hemliga
 -- nyckeln (service_role) som går förbi RLS.
 alter table lunch      enable row level security;
@@ -120,6 +132,7 @@ alter table systembolaget enable row level security;
 alter table trender    enable row level security;
 alter table riksbanken enable row level security;
 alter table shl        enable row level security;
+alter table shl_tabell enable row level security;
 
 drop policy if exists "alla får läsa" on lunch;
 drop policy if exists "alla får läsa" on lunch_info;
@@ -129,6 +142,7 @@ drop policy if exists "alla får läsa" on systembolaget;
 drop policy if exists "alla får läsa" on trender;
 drop policy if exists "alla får läsa" on riksbanken;
 drop policy if exists "alla får läsa" on shl;
+drop policy if exists "alla får läsa" on shl_tabell;
 create policy "alla får läsa" on lunch      for select to anon, authenticated using (true);
 create policy "alla får läsa" on lunch_info for select to anon, authenticated using (true);
 create policy "alla får läsa" on nyheter    for select to anon, authenticated using (true);
@@ -137,6 +151,7 @@ create policy "alla får läsa" on systembolaget for select to anon, authenticat
 create policy "alla får läsa" on trender    for select to anon, authenticated using (true);
 create policy "alla får läsa" on riksbanken for select to anon, authenticated using (true);
 create policy "alla får läsa" on shl        for select to anon, authenticated using (true);
+create policy "alla får läsa" on shl_tabell for select to anon, authenticated using (true);
 
-grant select on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl to anon, authenticated;
-grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl to service_role;
+grant select on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell to anon, authenticated;
+grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell to service_role;

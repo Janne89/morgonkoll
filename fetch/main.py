@@ -97,7 +97,11 @@ def styrranta(db):
 
 
 def shlmatcher(db):
-    matcher = shl.hamta()
+    filt = shl.forval()
+    matcher = shl.hamta(filt=filt)
+    tabell = shl.hamta_tabell(filt)
+    topp = ", ".join(f"{r['plats']}. {r['lag']} {r['poang']}p" for r in tabell[:5])
+    print(f"SHL-tabell: {topp} …")
     print(f"SHL: {len(matcher)} matcher")
     for m in matcher[:12]:
         resultat = f"{m['hemma_mal']}–{m['borta_mal']}" if m["hemma_mal"] is not None else ""
@@ -107,6 +111,7 @@ def shlmatcher(db):
             db.ersatt_alla("shl", matcher, "uuid")
         else:
             db._anrop("DELETE", "shl", params={"uuid": "not.is.null"})   # uppehåll – töm
+        db.ersatt_alla("shl_tabell", tabell, "plats")
 
 
 DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata,

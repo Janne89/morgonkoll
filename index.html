@@ -292,6 +292,14 @@
   .matchlag .turnering { display: block; font-size: 12px; color: var(--dampad); }
   .matchresultat { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   #sport details.hela summary { margin-top: 10px; }
+  .tabellval { font: inherit; font-size: 14px; margin: 8px 0 6px; padding: 3px 6px; border: 1px solid var(--linje); border-radius: 8px; background: var(--bg); color: var(--text); }
+  table.tabell { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .tabell th { font-size: 12px; font-weight: 400; color: var(--dampad); text-align: right; padding: 2px 4px; }
+  .tabell td { text-align: right; padding: 3px 4px; border-top: 1px solid var(--linje); }
+  .tabell .lagkol { text-align: left; width: 100%; }
+  .tabell td:first-child { color: var(--dampad); }
+  .tabell .poang { font-weight: 600; }
+  .tabell .grupp th { text-align: left; padding-top: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
 
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
@@ -1269,6 +1277,7 @@ const SPORTLIGOR = [
   ["775", "Champions League"], ["776", "Europa League"], ["710", "Ligue 1"], ["730", "Serie A"],
   ["740", "La Liga"], ["720", "Bundesliga"], ["shl", "SHL"], ["nhl", "NHL"],
 ];
+const SPORTFORVAL = ["sverige", "3945"];      // ikryssat från början: Sverige och Allsvenskan
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports";
 const SVENSKT_LANDSLAG = /^Sweden\b/;
 let sportUppdatering = null;
@@ -1342,10 +1351,82 @@ function matchlista(matcher, valda) {
   }).join("");
 }
 
+// Tabeller: ESPN för fotboll och NHL, Supabase för SHL. [nyckel, namn, ESPN-sökväg]
+const TABELLIGOR = [
+  ["3945", "Allsvenskan", "soccer/swe.1"], ["5362", "Superettan", "soccer/swe.2"], ["700", "Premier League", "soccer/eng.1"],
+  ["775", "Champions League", "soccer/uefa.champions"], ["776", "Europa League", "soccer/uefa.europa"],
+  ["710", "Ligue 1", "soccer/fra.1"], ["730", "Serie A", "soccer/ita.1"], ["740", "La Liga", "soccer/esp.1"],
+  ["720", "Bundesliga", "soccer/ger.1"], ["shl", "SHL", null], ["nhl", "NHL", "hockey/nhl"],
+];
+const tabellCache = {};       // nyckel → { tid, grupper: [{ namn, rader: [{ plats, lag, matcher, diff, poang }] }] }
+let tabellOppen = false;
+
+async function hamtaTabell(nyckel) {
+  const cache = tabellCache[nyckel];
+  if (cache && Date.now() - cache.tid < 15 * 60e3) return cache.grupper;
+  let grupper;
+  if (nyckel === "shl") {
+    const rader = await supabase("shl_tabell", "select=*&order=plats");
+    grupper = [{ namn: "", rader: rader.map(r => ({ plats: r.plats, lag: r.lag, matcher: r.matcher, diff: r.mal_diff, poang: r.poang })) }];
+  } else {
+    const vag = TABELLIGOR.find(([k]) => k === nyckel)[2];
+    const svar = await fetch(`https://site.api.espn.com/apis/v2/sports/${vag}/standings`);
+    if (!svar.ok) throw new Error(`ESPN svarade ${svar.status}`);
+    const data = await svar.json();
+    const samla = (x, ut = []) => { if (x.standings) ut.push(x); (x.children || []).forEach(c => samla(c, ut)); return ut; };
+    grupper = samla(data).map(g => {
+      const rader = g.standings.entries.map(e => {
+        const s = Object.fromEntries(e.stats.map(x => [x.name, x.value]));
+        return { rank: s.rank, lag: e.team.shortDisplayName || e.team.displayName, matcher: s.gamesPlayed, diff: s.pointDifferential, poang: s.points };
+      });
+      // Fotboll har rank; NHL sorteras på poäng, sedan färre matcher och målskillnad.
+      rader.sort((a, b) => (a.rank && b.rank) ? a.rank - b.rank : b.poang - a.poang || a.matcher - b.matcher || b.diff - a.diff);
+      rader.forEach((r, i) => r.plats = r.rank || i + 1);
+      return { namn: samla(data).length > 1 ? g.name : "", rader };
+    });
+  }
+  tabellCache[nyckel] = { tid: Date.now(), grupper };
+  return grupper;
+}
+
+async function ritaTabell(nyckel) {
+  const ruta = document.getElementById("tabell-innehall");
+  if (!ruta) return;
+  ruta.innerHTML = `<div class="info">Hämtar tabell…</div>`;
+  try {
+    const grupper = await hamtaTabell(nyckel);
+    if (!grupper.some(g => g.rader.length)) { ruta.innerHTML = `<div class="info">Ingen tabell just nu.</div>`; return; }
+    const diff = v => v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0";
+    ruta.innerHTML = `<table class="tabell">
+      <thead><tr><th>#</th><th class="lagkol">Lag</th><th>M</th><th>+/−</th><th>P</th></tr></thead>
+      ${grupper.map(g => `<tbody>${g.namn ? `<tr class="grupp"><th colspan="5">${esc(g.namn)}</th></tr>` : ""}
+        ${g.rader.map(r => `<tr><td>${r.plats}</td><td class="lagkol">${esc(r.lag)}</td><td>${r.matcher ?? ""}</td><td>${r.diff != null ? diff(r.diff) : ""}</td><td class="poang">${r.poang ?? ""}</td></tr>`).join("")}
+      </tbody>`).join("")}</table>`;
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta tabellen (${esc(e.message)}).</span>`;
+  }
+}
+
+function tabellsektion(valda) {
+  let vald = "3945";
+  try { vald = localStorage.getItem("sporttabell") || [...valda].find(k => TABELLIGOR.some(([t]) => t === k)) || "3945"; } catch {}
+  return `<details class="hela sporttabell"${tabellOppen ? " open" : ""}><summary>Tabell</summary>
+    <select class="tabellval" aria-label="Liga">${TABELLIGOR.map(([k, n]) => `<option value="${k}"${k === vald ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
+    <div id="tabell-innehall"></div></details>`;
+}
+
+function kopplaTabell(ruta) {
+  const details = ruta.querySelector(".sporttabell"), val = ruta.querySelector(".tabellval");
+  if (!details) return;
+  details.addEventListener("toggle", () => { tabellOppen = details.open; if (details.open) ritaTabell(val.value); });
+  val.addEventListener("change", () => { try { localStorage.setItem("sporttabell", val.value); } catch {} ritaTabell(val.value); });
+  if (details.open) ritaTabell(val.value);
+}
+
 async function visaSport() {
   const ruta = document.getElementById("sport-innehall");
   clearTimeout(sportUppdatering);
-  let valda = new Set(SPORTLIGOR.map(([k]) => k));
+  let valda = new Set(SPORTFORVAL);
   try { const s = JSON.parse(localStorage.getItem("sportligor") || "null"); if (Array.isArray(s)) valda = new Set(s); } catch {}
 
   const idag = lokal(new Date()).datum, igar = lokal(new Date(Date.now() - 864e5)).datum;
@@ -1378,7 +1459,9 @@ async function visaSport() {
       <div class="sportdag">Idag</div>
       ${idagHtml || `<div class="info">Inga matcher idag i de valda ligorna.</div>`}
       ${antalIgar ? `<details class="hela"><summary>Igår (${antalIgar} ${antalIgar === 1 ? "match" : "matcher"})</summary>${igarHtml}</details>` : ""}
-      ${fel.length ? `<div class="info">Kunde inte hämta allt (${esc(fel.join(", "))}).</div>` : ""}`;
+      ${fel.length ? `<div class="info">Kunde inte hämta allt (${esc(fel.join(", "))}).</div>` : ""}
+      ${tabellsektion(valda)}`;
+    kopplaTabell(ruta);
     ruta.querySelectorAll("[data-liga]").forEach(b => b.onclick = () => {
       valda.has(b.dataset.liga) ? valda.delete(b.dataset.liga) : valda.add(b.dataset.liga);
       try { localStorage.setItem("sportligor", JSON.stringify([...valda])); } catch {}
