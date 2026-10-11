@@ -27,7 +27,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
-| Lunch: Bättre Mat & Bar (veckomeny-PDF), Lulu, Ai Ramen Kita, Zaap Thai och Phils (inskrivna/fasta menyer) | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
+| Lunch: Bättre Mat & Bar (veckomeny-PDF), Lulu, Ai Ramen Kita, Zaap Thai och Phils (inskrivna/fasta menyer) | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 07:15–10:15 |
 
 Varje kort visar diskret i källraden när datan senast hämtades. Står sidan öppen hämtar den
 väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
@@ -36,19 +36,24 @@ väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut
 Nyhetssajterna, Yahoo, Riksbanken, Google Trends och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
 av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
 
-## Schema (GitHub Actions)
+## Schema (Supabase pg_cron → GitHub Actions)
 
-[.github/workflows/hamta.yml](.github/workflows/hamta.yml). Cron är i UTC – svensk tid är +1 (vinter) / +2 (sommar).
+Supabase startar [.github/workflows/hamta.yml](.github/workflows/hamta.yml) via GitHubs API: ett pg_cron-jobb
+kör `privat.starta_hamtning()` var 15:e minut och väljer delar efter svensk tid (sommar/vinter sköts av sig själv).
+Allt finns i [supabase/hamtning.sql](supabase/hamtning.sql). GitHubs egen `schedule` används inte – den hoppade
+över de flesta körningarna.
 
-| Cron (UTC) | Svensk tid (ca) | Kör |
-|---|---|---|
-| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget, evenemang) |
-| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
-| `*/15 6-20 * * 0,6` | helger 07–21:45 vinter / 08–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
-| `37 5 * * 0,6` | helgmorgnar 06:37 vinter / 07:37 sommar | allt (för evenemang m.m.) |
-| manuellt (Run workflow) | – | allt |
+| Svensk tid | Kör |
+|---|---|
+| vardagar 07:15, 08:15, 09:15, 10:15 | allt (lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget, evenemang) |
+| vardagar 06:00–22:45, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
+| helger 08:00–22:45, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
+| helger 07:30 | allt (för evenemang m.m.) |
+| manuellt (Run workflow) | valfria delar, tomt = allt |
 
-- GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
+- Anropet kräver en GitHub-token (fine-grained, bara detta repo, *Actions: Read and write*) i Supabase Vault
+  som `github_hamta`. **Går token ut slutar hämtningen** – byt den enligt kommentaren i `hamtning.sql`.
+- Felsökning: `net._http_response` ska visa status 204 (se slutet av `hamtning.sql`).
 - Två körningar körs aldrig samtidigt (`concurrency`).
 - Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken] [shl] [evenemang]` – utan argument körs allt.
   Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
@@ -61,17 +66,18 @@ GitHub Pages (index.html)
    ├─ Väder (SMHI), elpris, SL-avgångar, namnsdag (Svenska dagar) och verktygens data: direkt i webbläsaren
    └─ Lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget, evenemang: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
-GitHub Actions (se schema ovan)
+GitHub Actions (startas av Supabase pg_cron, se schema ovan)
    └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
 ```
 
 ### Beslut
-- **Hämtning:** GitHub Actions + Python (inte Supabase Edge Functions).
-  Obs: GitHub stänger av schemalagda körningar efter 60 dagar utan commits – slå på igen i Actions-fliken.
+- **Hämtning:** GitHub Actions + Python (inte Supabase Edge Functions), schemalagt med pg_cron i Supabase
+  eftersom GitHubs `schedule` är för opålitlig för var 15:e minut.
 - **Supabase:** eget projekt `morgonkoll`, region Stockholm. Data API på, auto-expose av, automatic RLS på.
   Tabeller och rättigheter: [supabase/tabeller.sql](supabase/tabeller.sql) (går att köra flera gånger).
 - **Hemligheter:** repot är publikt. Hemlig Supabase-nyckel bara som GitHub Secret
   (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`), aldrig i koden. Den publika nyckeln ligger i `index.html`.
+  GitHub-token för att starta workflowen ligger bara i Supabase Vault (`github_hamta`).
 - **Stil i koden:** svenska namn och kommentarer.
 
 ## Detaljer per källa

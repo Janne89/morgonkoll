@@ -1,17 +1,8 @@
 name: Hämta
 
 on:
-  schedule:
-    # Tider i UTC (Stockholm är +1 vintertid, +2 sommartid).
-    # Lunch + allt (även Systembolagets släpp): vardagsmorgnar. Menyn byts måndag morgon, så vi hämtar flera gånger.
-    - cron: "17 5-8 * * 1-5"
-    # Nyheter + börs + Google Trends + Riksbanken (räntebesked 09:30): var 15:e minut på vardagar, ungefär 06–22 svensk tid (täcker USA-börsen).
-    - cron: "*/15 4-20 * * 1-5"
-    # Samma på helger (bitcoin och SHL), var 15:e minut ungefär 07–22 svensk tid.
-    - cron: "*/15 6-20 * * 0,6"
-    # Allt en gång på helgmorgnar (evenemang, Systembolaget m.m. – lunchen finns inte på helger men skadar inte).
-    - cron: "37 5 * * 0,6"
-  # Manuellt eller från Supabase (pg_cron, se supabase/hamtning.sql). Tomt = allt.
+  # Startas av Supabase (pg_cron, schemat finns i supabase/hamtning.sql) eller manuellt.
+  # GitHubs egen schedule används inte – den hoppade över de flesta körningarna.
   workflow_dispatch:
     inputs:
       delar:
@@ -29,17 +20,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Välj delar
-        id: delar
-        env:
-          VALDA: ${{ inputs.delar }}
-        run: |
-          case "${{ github.event.schedule }}" in
-            "*/15 4-20 * * 1-5") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
-            "*/15 6-20 * * 0,6") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
-            "")                  echo "delar=$VALDA" >> "$GITHUB_OUTPUT" ;;  # manuellt/Supabase: valda delar, tomt = allt
-            *)                   echo "delar=" >> "$GITHUB_OUTPUT" ;;  # lunchschemat: allt
-          esac
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
@@ -47,11 +27,11 @@ jobs:
           cache: pip
           cache-dependency-path: fetch/requirements.txt
       # Poppler behövs bara för lunch-PDF:en.
-      - if: steps.delar.outputs.delar == ''
+      - if: inputs.delar == ''
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: pip install -r fetch/requirements.txt
       - run: python fetch/main.py $DELAR
         env:
-          DELAR: ${{ steps.delar.outputs.delar }}
+          DELAR: ${{ inputs.delar }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
