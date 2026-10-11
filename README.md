@@ -218,6 +218,7 @@ Hopfällt kort längst ner med en flik per verktyg (öppet/stängt, vald flik oc
 i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
 - **Löptempo:** fyll i två av distans, tid och tempo/hastighet så räknas resten ut. Ändrar man något räknas
   ett tomt eller uträknat fält om; har man själv fyllt i både distans och tid ändras tiden (distansen behålls).
+  Kolon fylls i automatiskt i tid och tempo (4530 → 45:30, 14530 → 1:45:30).
   Koden ligger i `startaTempo()` i [index.html](index.html).
 - **Ränta:** överst styrräntan (senaste ändring), nästa räntebesked och Riksbankens senaste penningpolitiska
   pressmeddelanden. Sedan räknaren: lån och ränta → räntekostnad per månad och år, och efter ränteavdrag (30 % på upp till

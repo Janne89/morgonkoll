@@ -476,10 +476,10 @@
             <button type="button" data-km="42.195">Mara</button>
           </div>
           <label for="tempo-tid">Tid</label>
-          <input id="tempo-tid" data-grupp="tid" inputmode="decimal" autocomplete="off" placeholder="h:mm:ss">
+          <input id="tempo-tid" data-grupp="tid" inputmode="numeric" autocomplete="off" placeholder="h:mm:ss">
           <span class="enhet"></span>
           <label for="tempo-tempo">Tempo</label>
-          <input id="tempo-tempo" data-grupp="fart" inputmode="decimal" autocomplete="off" placeholder="m:ss">
+          <input id="tempo-tempo" data-grupp="fart" inputmode="numeric" autocomplete="off" placeholder="m:ss">
           <span class="enhet">/km</span>
           <label for="tempo-hastighet">Hastighet</label>
           <input id="tempo-hastighet" data-grupp="fart" inputmode="decimal" autocomplete="off" placeholder="12,0">
@@ -1803,8 +1803,19 @@ function startaTempo() {
     }
   }
 
+  // Kolon fylls i automatiskt, som på en timer: 4530 → 45:30, 14530 → 1:45:30. Med komma (45,5 min) lämnas fältet orört.
+  function kolon(el) {
+    if (/[,.]/.test(el.value)) return;
+    const siffror = el.value.replace(/\D/g, "").replace(/^0+(?=\d{3})/, "").slice(0, 6);
+    const delar = siffror.length <= 2 ? [siffror] : siffror.length <= 4
+      ? [siffror.slice(0, -2), siffror.slice(-2)]
+      : [siffror.slice(0, -4), siffror.slice(-4, -2), siffror.slice(-2)];
+    el.value = delar.join(":");
+  }
+
   function andrad(el) {
     el.classList.remove("raknad");
+    if (el === falt.tid || el === falt.tempo) kolon(el);
     // Tempo och hastighet är samma sak – håll dem i takt.
     if (el === falt.tempo) {
       const p = lasTid(el.value);
