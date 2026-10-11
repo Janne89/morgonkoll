@@ -11,7 +11,13 @@ on:
     - cron: "*/15 6-20 * * 0,6"
     # Allt en gång på helgmorgnar (evenemang, Systembolaget m.m. – lunchen finns inte på helger men skadar inte).
     - cron: "37 5 * * 0,6"
+  # Manuellt eller från Supabase (pg_cron, se supabase/hamtning.sql). Tomt = allt.
   workflow_dispatch:
+    inputs:
+      delar:
+        description: "Delar att hämta, t.ex. \"nyheter bors\" (tomt = allt)"
+        required: false
+        default: ""
 
 # Kör aldrig två hämtningar samtidigt.
 concurrency:
@@ -25,11 +31,14 @@ jobs:
     steps:
       - name: Välj delar
         id: delar
+        env:
+          VALDA: ${{ inputs.delar }}
         run: |
           case "${{ github.event.schedule }}" in
             "*/15 4-20 * * 1-5") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
             "*/15 6-20 * * 0,6") echo "delar=nyheter bors trender riksbanken shl" >> "$GITHUB_OUTPUT" ;;
-            *)                   echo "delar=" >> "$GITHUB_OUTPUT" ;;  # lunchschemat och manuellt: allt
+            "")                  echo "delar=$VALDA" >> "$GITHUB_OUTPUT" ;;  # manuellt/Supabase: valda delar, tomt = allt
+            *)                   echo "delar=" >> "$GITHUB_OUTPUT" ;;  # lunchschemat: allt
           esac
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -41,7 +50,8 @@ jobs:
       - if: steps.delar.outputs.delar == ''
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - run: pip install -r fetch/requirements.txt
-      - run: python fetch/main.py ${{ steps.delar.outputs.delar }}
+      - run: python fetch/main.py $DELAR
         env:
+          DELAR: ${{ steps.delar.outputs.delar }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
