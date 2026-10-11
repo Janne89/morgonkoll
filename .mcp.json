@@ -4,6 +4,11 @@
       "command": "npx",
       "args": ["-y", "@supabase/mcp-server-supabase@latest", "--project-ref=axmmuhrvvjsgedetibiq"],
       "env": { "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}" }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--browser=msedge", "--isolated", "--headless",
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0"]
     }
   }
 }
