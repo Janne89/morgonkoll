@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #trender { order: 4; } #sl { order: 5; } #lunch { order: 6; } #systembolaget { order: 7; } #verktyg { order: 8; }
+  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #sl { order: 6; } #lunch { order: 7; } #systembolaget { order: 8; } #verktyg { order: 9; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -164,6 +164,24 @@
   .avgang .nar { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .avgang.installd .mal, .avgang.installd .nar { text-decoration: line-through; color: var(--dampad); }
 
+  /* Elpris */
+  #elpris .flikar { margin: -4px 0 6px; }
+  #elpris .flikavdelare { width: 10px; }
+  .elnu { margin: 6px 0 2px; color: var(--dampad); font-size: 14px; }
+  .elnu .varde { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .elnu .nar { margin-left: 6px; }
+  .elsammanfattning { font-size: 14px; color: var(--dampad); margin-bottom: 8px; }
+  svg.eldiagram { width: 100%; height: auto; display: block; overflow: visible; }
+  .eldiagram .stapel path { fill: var(--regn); }
+  .eldiagram .stapel.passerad path { opacity: 0.35; }
+  .eldiagram .stapel.nu path { fill: var(--accent); }
+  .eldiagram .stapel:hover path, .eldiagram .stapel:focus path { opacity: 1; filter: brightness(1.15); }
+  .eldiagram .stapel:focus { outline: none; }
+  .eldiagram .etikett { fill: var(--text); font-size: 11px; font-weight: 600; }
+  .eldiagram .baslinje { stroke: var(--linje); stroke-width: 1; }
+  .elavlasning { font-size: 13px; color: var(--dampad); margin-top: 4px; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+  .elfonster { font-size: 14px; margin-top: 4px; }
+
   /* Trender */
   .trend { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 7px 0; border-bottom: 1px solid var(--linje); }
   .trend:last-child { border-bottom: 0; }
@@ -246,6 +264,7 @@
 
   <nav class="hopp" aria-label="Hoppa till">
     <a href="#vader">Väder</a>
+    <a href="#elpris">El</a>
     <a href="#bors">Börs</a>
     <a href="#nyheter">Nyheter</a>
     <a href="#trender">Trender</a>
@@ -260,6 +279,12 @@
       <h2>Väder · Stockholm</h2>
       <div id="vader-innehall">Hämtar prognos…</div>
       <div class="kalla">Källa: <a href="https://www.smhi.se/">SMHI</a> (CC BY 4.0)<span class="tid" id="vader-tid"></span></div>
+    </section>
+
+    <section class="kort" id="elpris">
+      <h2 id="elpris-rubrik">Elpris</h2>
+      <div id="elpris-innehall">Hämtar elpriset…</div>
+      <div class="kalla">Källa: <a href="https://www.elprisetjustnu.se/">elprisetjustnu.se</a> (Nord Pool) · inkl. moms, utan nätavgift och påslag<span class="tid" id="elpris-tid"></span></div>
     </section>
 
     <section class="kort" id="nyheter">
@@ -306,6 +331,7 @@
           <button type="button" data-verktyg="tempo" aria-pressed="true">Löptempo</button>
           <button type="button" data-verktyg="ranta" aria-pressed="false">Ränta</button>
           <button type="button" data-verktyg="lon" aria-pressed="false">Lön</button>
+          <button type="button" data-verktyg="inflation" aria-pressed="false">Inflation</button>
         </div>
         <div data-panel="tempo">
         <div class="formular">
@@ -385,6 +411,21 @@
           </div>
           <div class="ranteresultat" id="lon-resultat"></div>
           <div class="verktyg-fot"><span>Skatteverkets skattetabell för året – det arbetsgivaren drar varje månad. Slutlig skatt kan skilja något.</span></div>
+        </div>
+        <div data-panel="inflation" hidden>
+          <div class="formular">
+            <label for="infl-belopp">Belopp</label>
+            <input id="infl-belopp" inputmode="numeric" autocomplete="off" placeholder="100">
+            <span class="enhet">kr</span>
+            <label for="infl-fran">Från år</label>
+            <select id="infl-fran"><option>Hämtar KPI…</option></select>
+            <span class="enhet"></span>
+            <label for="infl-till">Till</label>
+            <select id="infl-till"></select>
+            <span class="enhet"></span>
+          </div>
+          <div class="ranteresultat" id="infl-resultat"></div>
+          <div class="verktyg-fot"><span>Konsumentprisindex (KPI) från SCB, juli 1914 = 100. Årtal räknas som årets snitt, "i dag" som senaste månaden.</span></div>
         </div>
       </details>
     </section>
@@ -732,6 +773,133 @@ async function visaSL() {
     return `<div class="hallplats"><div class="rubrik">${esc(h.namn)}</div>${innehall}</div>`;
   }).join("");
   if (resultat.some(r => r.status === "fulfilled")) visaTid("sl-tid", new Date().toISOString());
+}
+
+// --- Elpris ---
+
+// elprisetjustnu.se (Nord Pool-priser, CORS tillåtet). Priserna är exkl. moms – vi visar inkl. 25 % moms.
+const ELOMRADEN = ["SE1", "SE2", "SE3", "SE4"];
+const ELMOMS = 1.25;
+const elpriser = {};          // "2026-10-11_SE3" → [{ start, slut, ore }] eller null
+
+async function hamtaElpris(datum, omrade) {
+  const nyckel = `${datum}_${omrade}`;
+  if (!(nyckel in elpriser)) {
+    const [ar, man, dag] = datum.split("-");
+    const svar = await fetch(`https://www.elprisetjustnu.se/api/v1/prices/${ar}/${man}-${dag}_${omrade}.json`);
+    if (svar.status === 404) return elpriser[nyckel] = null;    // morgondagens priser kommer ca 13:00
+    if (!svar.ok) throw new Error(`elprisetjustnu.se svarade ${svar.status}`);
+    elpriser[nyckel] = (await svar.json()).map(p => ({
+      start: new Date(p.time_start), slut: new Date(p.time_end), ore: p.SEK_per_kWh * ELMOMS * 100,
+    }));
+  }
+  return elpriser[nyckel];
+}
+
+const ore = v => `${Math.round(v)} öre`;
+const klocka = d => d.toLocaleTimeString("sv-SE", { timeZone: "Europe/Stockholm", hour: "2-digit", minute: "2-digit" });
+const timmeText = h => String(h).padStart(2, "0");
+
+// Kvartspriser → timmedel, i tidsordning.
+function perTimme(priser) {
+  const timmar = new Map();
+  for (const p of priser) {
+    const h = lokal(p.start).timme;
+    if (!timmar.has(h)) timmar.set(h, []);
+    timmar.get(h).push(p.ore);
+  }
+  return [...timmar].map(([h, v]) => ({ h, ore: v.reduce((a, b) => a + b, 0) / v.length }));
+}
+
+// Billigaste sammanhängande period på `timmar` timmar från och med nu.
+function billigastFonster(priser, timmar) {
+  const kvar = priser.filter(p => p.slut > new Date());
+  const n = timmar * 4;
+  let bast = null;
+  for (let i = 0; i + n <= kvar.length; i++) {
+    const snitt = kvar.slice(i, i + n).reduce((s, p) => s + p.ore, 0) / n;
+    if (!bast || snitt < bast.snitt) bast = { start: kvar[i].start, slut: kvar[i + n - 1].slut, snitt };
+  }
+  return bast;
+}
+
+function eldiagram(timmar, aktuell) {
+  const B = 520, H = 120, topp = 16, botten = 18, slot = B / timmar.length;
+  const bredd = Math.min(24, slot - 2);
+  const hog = Math.max(0, ...timmar.map(t => t.ore)), lag = Math.min(0, ...timmar.map(t => t.ore));
+  const y = v => topp + (hog - v) / ((hog - lag) || 1) * (H - topp - botten);
+  const max = timmar.reduce((a, b) => b.ore > a.ore ? b : a), min = timmar.reduce((a, b) => b.ore < a.ore ? b : a);
+  const staplar = timmar.map((t, i) => {
+    const x = i * slot + (slot - bredd) / 2, y0 = y(0), y1 = y(t.ore), r = Math.min(4, Math.abs(y0 - y1));
+    // Rundad ände bort från baslinjen, rak mot den.
+    const d = t.ore >= 0
+      ? `M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + bredd - r} Q${x + bredd},${y1} ${x + bredd},${y1 + r} V${y0} Z`
+      : `M${x},${y0} V${y1 - r} Q${x},${y1} ${x + r},${y1} H${x + bredd - r} Q${x + bredd},${y1} ${x + bredd},${y1 - r} V${y0} Z`;
+    const klass = t.h === aktuell ? "nu" : aktuell != null && t.h < aktuell ? "passerad" : "";
+    const etikett = t === max || t === min
+      ? `<text class="etikett" x="${x + bredd / 2}" y="${t.ore >= 0 ? y1 - 4 : y1 + 12}" text-anchor="middle">${Math.round(t.ore)}</text>` : "";
+    return `<g class="stapel ${klass}" data-i="${i}" tabindex="0"><rect x="${i * slot}" y="0" width="${slot}" height="${H - botten}" fill="transparent"/><path d="${d}"/>${etikett}</g>`;
+  }).join("");
+  const axel = timmar.map((t, i) => t.h % 3 === 0
+    ? `<text x="${i * slot + slot / 2}" y="${H - 4}" text-anchor="middle">${timmeText(t.h)}</text>` : "").join("");
+  return `<svg class="eldiagram" viewBox="0 0 ${B} ${H}" role="img" aria-label="Elpris per timme">
+    <line class="baslinje" x1="0" x2="${B}" y1="${y(0)}" y2="${y(0)}"/>${staplar}${axel}</svg>`;
+}
+
+async function visaElpris() {
+  const ruta = document.getElementById("elpris-innehall");
+  let omrade = "SE3", dag = "idag";
+  try { omrade = localStorage.getItem("elomrade") || "SE3"; } catch {}
+  if (!ELOMRADEN.includes(omrade)) omrade = "SE3";
+  const idag = lokal(new Date()).datum, imorgon = lokal(new Date(Date.now() + 864e5)).datum;
+
+  async function rita() {
+    try {
+      const [prisIdag, prisImorgon] = await Promise.all([hamtaElpris(idag, omrade), hamtaElpris(imorgon, omrade)]);
+      if (!prisIdag) throw new Error("inga priser för idag");
+      if (dag === "imorgon" && !prisImorgon) dag = "idag";
+      const visade = dag === "idag" ? prisIdag : prisImorgon;
+      const timmar = perTimme(visade);
+      const nu = new Date();
+      const kvart = prisIdag.find(p => p.start <= nu && nu < p.slut);
+      const snitt = visade.reduce((s, p) => s + p.ore, 0) / visade.length;
+      const min = timmar.reduce((a, b) => b.ore < a.ore ? b : a), max = timmar.reduce((a, b) => b.ore > a.ore ? b : a);
+      const fonster = billigastFonster([...prisIdag, ...(prisImorgon || [])], 3);
+      const fonsterDag = fonster && lokal(fonster.start).datum !== idag ? " i natt/imorgon" : "";
+      const knapp = (varde, text, attr, aktiv) => `<button type="button" ${attr}="${varde}" aria-pressed="${varde === aktiv}">${text}</button>`;
+
+      ruta.innerHTML = `
+        <div class="flikar">
+          ${knapp("idag", "Idag", "data-dag", dag)}${prisImorgon ? knapp("imorgon", "Imorgon", "data-dag", dag) : ""}
+          <span class="flikavdelare"></span>${ELOMRADEN.map(o => knapp(o, o, "data-omrade", omrade)).join("")}
+        </div>
+        ${dag === "idag" && kvart ? `<div class="elnu"><span class="varde">${Math.round(kvart.ore)}</span> öre/kWh <span class="nar">just nu, ${klocka(kvart.start)}–${klocka(kvart.slut)}</span></div>` : ""}
+        <div class="elsammanfattning">Lägst ${ore(min.ore)} (${timmeText(min.h)}–${timmeText((min.h + 1) % 24)}) · högst ${ore(max.ore)} (${timmeText(max.h)}–${timmeText((max.h + 1) % 24)}) · snitt ${ore(snitt)}</div>
+        ${eldiagram(timmar, dag === "idag" ? lokal(nu).timme : null)}
+        <div class="elavlasning" aria-live="polite">Håll över en stapel för timpriset.</div>
+        ${fonster ? `<div class="elfonster">Billigast 3 timmar i följd: <strong>${klocka(fonster.start)}–${klocka(fonster.slut)}</strong>${fonsterDag}, snitt ${ore(fonster.snitt)}</div>` : ""}`;
+
+      const avlasning = ruta.querySelector(".elavlasning");
+      ruta.querySelectorAll(".stapel").forEach(g => {
+        const t = timmar[g.dataset.i];
+        const visa = () => { avlasning.textContent = `${timmeText(t.h)}–${timmeText((t.h + 1) % 24)}: ${ore(t.ore)}/kWh`; };
+        g.addEventListener("pointerenter", visa);
+        g.addEventListener("focus", visa);
+      });
+      ruta.querySelectorAll("[data-dag]").forEach(b => b.onclick = () => { dag = b.dataset.dag; rita(); });
+      ruta.querySelectorAll("[data-omrade]").forEach(b => b.onclick = () => {
+        omrade = b.dataset.omrade;
+        try { localStorage.setItem("elomrade", omrade); } catch {}
+        document.getElementById("elpris-rubrik").textContent = `Elpris · ${omrade}`;
+        rita();
+      });
+      document.getElementById("elpris-rubrik").textContent = `Elpris · ${omrade}`;
+      visaTid("elpris-tid", new Date().toISOString());
+    } catch (e) {
+      ruta.innerHTML = `<span class="fel">Kunde inte hämta elpriset (${esc(e.message)}).</span>`;
+    }
+  }
+  await rita();
 }
 
 // --- Google Trends ---
@@ -1156,6 +1324,84 @@ function startaLon() {
   return ladda;      // anropas när fliken visas, så att inget hämtas i onödan
 }
 
+// --- Verktyg: inflation ---
+
+// SCB:s KPI per månad, juli 1914 = 100. text/plain gör anropet "enkelt" så att ingen
+// CORS-förfrågan behövs (SCB svarar inte på sådana med tillåtna headers).
+const SCB_KPI = "https://api.scb.se/OV0104/v1/doris/sv/ssd/PR/PR0101/PR0101A/KPILevindexM";
+let kpi = null;     // { ar: { 1995: snitt }, senast: { manad: "2026M08", index } }
+
+async function hamtaKpi() {
+  if (kpi) return kpi;
+  const svar = await fetch(SCB_KPI, {
+    method: "POST", headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ query: [], response: { format: "json" } }),
+  });
+  if (!svar.ok) throw new Error(`SCB svarade ${svar.status}`);
+  const manader = (await svar.json()).data
+    .map(d => ({ manad: d.key[0], index: Number(d.values[0]) }))
+    .filter(d => d.index > 0);
+  const perAr = {};
+  for (const { manad, index } of manader) (perAr[manad.slice(0, 4)] ||= []).push(index);
+  const ar = Object.fromEntries(Object.entries(perAr).map(([a, v]) => [a, v.reduce((s, x) => s + x, 0) / v.length]));
+  return kpi = { ar, senast: manader.at(-1) };
+}
+
+const manadText = m => new Date(`${m.slice(0, 4)}-${m.slice(5)}-15`).toLocaleDateString("sv-SE", { month: "short", year: "numeric" });
+
+function startaInflation() {
+  const f = id => document.getElementById("infl-" + id);
+  const [belopp, fran, till, ut] = ["belopp", "fran", "till", "resultat"].map(f);
+  const sparat = id => { try { return localStorage.getItem(id) || ""; } catch { return ""; } };
+  let laddad = false;
+
+  async function ladda() {
+    if (laddad) return;
+    laddad = true;
+    try {
+      const { ar, senast } = await hamtaKpi();
+      const aren = Object.keys(ar).sort().reverse();
+      fran.innerHTML = aren.map(a => `<option>${a}</option>`).join("");
+      till.innerHTML = `<option value="idag">I dag (${esc(manadText(senast.manad))})</option>` + aren.map(a => `<option>${a}</option>`).join("");
+      fran.value = sparat("infl-fran") || "1995";
+      till.value = sparat("infl-till") || "idag";
+      belopp.value = sparat("infl-belopp") || "100";
+      rakna();
+    } catch (e) {
+      laddad = false;
+      ut.innerHTML = `<span class="fel">Kunde inte hämta KPI från SCB (${esc(e.message)}).</span>`;
+    }
+  }
+
+  function rakna() {
+    if (!kpi) return;
+    const summa = lasKronor(belopp.value);
+    if (Number.isNaN(summa)) belopp.setAttribute("aria-invalid", "true"); else belopp.removeAttribute("aria-invalid");
+    const a = kpi.ar[fran.value];
+    const b = till.value === "idag" ? kpi.senast.index : kpi.ar[till.value];
+    if (!(summa > 0) || !a || !b) { ut.innerHTML = ""; return; }
+    const tillText = till.value === "idag" ? `i dag (${manadText(kpi.senast.manad)})` : `år ${till.value}`;
+    const tillAr = till.value === "idag" ? Number(kpi.senast.manad.slice(0, 4)) + (Number(kpi.senast.manad.slice(5)) - 6.5) / 12 : Number(till.value);
+    const ar = tillAr - Number(fran.value);
+    const faktor = b / a;
+    const perAr = ar > 0.5 ? (Math.pow(faktor, 1 / ar) - 1) * 100 : null;
+    const forandring = (faktor - 1) * 100;
+    const decimaler = v => v < 10 ? 2 : 0;
+    ut.innerHTML = `
+      <div class="avdrag">${kronor(summa)} år ${esc(fran.value)} motsvarar ${esc(tillText)}</div>
+      <div class="rad stor"><span></span><strong>${tal(summa * faktor, decimaler(summa * faktor))} kr</strong></div>
+      <div class="rad"><span>${forandring >= 0 ? "Prisökning" : "Prisminskning"}</span><span>${tal(Math.abs(forandring), 1)} %</span></div>
+      ${perAr != null ? `<div class="rad"><span>I snitt per år</span><span>${tal(perAr, 1)} %</span></div>` : ""}
+      <div class="avdrag">Omvänt: ${kronor(summa)} ${esc(tillText)} motsvarar ${tal(summa / faktor, decimaler(summa / faktor))} kr år ${esc(fran.value)}.</div>`;
+  }
+
+  for (const el of [belopp, fran, till]) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
+    try { localStorage.setItem(el.id, el.value); } catch {}
+    rakna();
+  });
+  return ladda;
+}
+
 function startaVerktyg() {
   const ruta = document.getElementById("verktyg");
   const details = ruta.querySelector("details");
@@ -1165,12 +1411,12 @@ function startaVerktyg() {
   startaTempo();
   startaRanta();
   visaStyrranta();
-  const laddaLon = startaLon();
+  const laddare = { lon: startaLon(), inflation: startaInflation() };
 
   const knappar = [...ruta.querySelectorAll("[data-verktyg]")];
   let vald = "tempo";
-  // Lönefliken hämtar från Skatteverket – bara när den faktiskt syns.
-  const laddaOmSynlig = () => { if (details.open && vald === "lon") laddaLon(); };
+  // Lön och inflation hämtar från Skatteverket/SCB – bara när fliken faktiskt syns.
+  const laddaOmSynlig = () => { if (details.open && laddare[vald]) laddare[vald](); };
   const visa = namn => {
     vald = namn;
     knappar.forEach(b => b.setAttribute("aria-pressed", b.dataset.verktyg === namn));
@@ -1311,6 +1557,7 @@ document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${d
 visaDagen();
 startaVerktyg();
 visaVader();
+visaElpris();
 visaSL();
 visaLunch();
 visaNyheter();
@@ -1322,6 +1569,7 @@ visaSystembolaget();
 setInterval(() => {
   if (document.visibilityState !== "visible") return;
   visaVader();
+  visaElpris();
   visaNyheter();
   visaTrender();
   visaBors();

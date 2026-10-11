@@ -1,6 +1,6 @@
 # Morgonkoll
 
-Daglig morgonöversikt för mig och kollegorna: väder, SL-avgångar, börs, nyheter, Google-trender, lunch, Systembolagets släpp och dagens namnsdag på en sida.
+Daglig morgonöversikt för mig och kollegorna: väder, elpris, SL-avgångar, börs, nyheter, Google-trender, lunch, Systembolagets släpp och dagens namnsdag på en sida.
 
 Live: https://janne89.github.io/morgonkoll/
 
@@ -10,6 +10,7 @@ Live: https://janne89.github.io/morgonkoll/
 |---|---|---|---|
 | Väder | [SMHI](https://www.smhi.se/) öppna prognos-API | I webbläsaren | Varje gång sidan öppnas (SMHI gör ny prognos ungefär varje timme) |
 | SL-avgångar: Arenan, Solna station | [SL Transport API](https://www.trafiklab.se/api/our-apis/sl/transport/) (öppet, ingen nyckel) | I webbläsaren | Varje minut medan fliken syns (realtid) |
+| Elpris idag/imorgon per elområde (SE1–SE4) | [elprisetjustnu.se](https://www.elprisetjustnu.se/) (Nord Pool) | I webbläsaren | När sidan öppnas och var 15:e min (morgondagens priser ca 13:00) |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -23,7 +24,7 @@ Live: https://janne89.github.io/morgonkoll/
 Varje kort visar diskret i källraden när datan senast hämtades. Står sidan öppen hämtar den
 väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
 
-**Varför två vägar?** SMHI, SL och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
+**Varför två vägar?** SMHI, SL, elprisetjustnu.se och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
 SVT, Di, Yahoo, Riksbanken, Google Trends och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
 av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
 
@@ -48,7 +49,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 ```
 GitHub Pages (index.html)
-   ├─ Väder (SMHI), SL-avgångar och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
+   ├─ Väder (SMHI), elpris, SL-avgångar, namnsdag (Svenska dagar) och verktygens data: direkt i webbläsaren
    └─ Lunch, nyheter, börs, trender, Riksbanken, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
@@ -71,6 +72,12 @@ GitHub Actions (se schema ovan)
 - Licens CC BY 4.0 – SMHI anges som källa. (Open-Meteo valdes bort: bara gratis för icke-kommersiellt bruk.)
 - Timvärden: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
   `wind_speed`, `symbol_code` (Wsymb2, 1–27). Kortet visar nuläge, 16 timmar framåt och 5 dagar.
+
+### Elpris
+- `https://www.elprisetjustnu.se/api/v1/prices/ÅÅÅÅ/MM-DD_SE3.json` – spotpris per kvart, exkl. moms.
+  Kortet visar inkl. 25 % moms (utan nätavgift och elhandlarens påslag), timmedel i diagrammet,
+  priset just nu och billigaste 3 timmar i följd framåt. Morgondagen (404 innan ca 13:00) får egen flik.
+- Elområdet väljs i kortet och sparas i webbläsaren (förvalt SE3).
 
 ### SL-avgångar
 - `https://transport.integration.sl.se/v1/sites/<id>/departures?forecast=60` – realtid, öppen CORS, ingen nyckel.
@@ -162,6 +169,10 @@ i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
     står skatten i kronor, därovan som procent av lönen.
   - Brytpunkten räknas fram ur tabellen (där marginalskatten hoppar 20 procentenheter), så inget hårdkodas.
   Koden ligger i `startaLon()`.
+- **Inflation:** belopp, från år och till år/i dag → motsvarande belopp, prisökning och snitt per år.
+  KPI per månad (juli 1914 = 100) från SCB:s tabell `KPILevindexM`, hämtas när fliken visas. Årtal räknas som
+  årets snitt, "i dag" som senaste månaden. Anropet skickas som `text/plain` så att ingen CORS-förfrågan behövs.
+  Koden ligger i `startaInflation()`.
 
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
