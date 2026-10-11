@@ -13,9 +13,9 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, evenemang, lunch_airamen, lunch_battre, lunch_lulu, lunch_zaap, nyheter, riksbanken, shl, systembolaget, trender
+from sources import bors, evenemang, lunch_airamen, lunch_battre, lunch_lulu, lunch_phils, lunch_zaap, nyheter, riksbanken, shl, systembolaget, trender
 
-LUNCHKALLOR = [lunch_battre, lunch_lulu, lunch_airamen, lunch_zaap]
+LUNCHKALLOR = [lunch_battre, lunch_lulu, lunch_airamen, lunch_zaap, lunch_phils]
 
 
 def ar_for_vecka(vecka, idag=None):
