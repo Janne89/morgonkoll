@@ -93,11 +93,12 @@ GitHub Actions (se schema ovan)
 ### Evenemang i Stockholm
 - Visit Stockholms öppna API (`api.visitstockholm.com/api/v1/`, CC BY 4.0 – Stockholm Business Region ska anges):
   - `forecast-events/` – stora evenemang med förväntat antal besökare (arenakonserter, festivaler, lopp). De närmaste
-    60 dagarna sparas, kortet visar de 4 första.
+    60 dagarna sparas.
   - `singulareventdates/?date_from=…&date_to=…&page=…` – evenemang den närmaste veckan (16 per sida). Bara de som är
     högst 3 dagar långa sparas, annars drunknar resten i långa utställningar. Kategorierna översätts i kortet.
 - [fetch/sources/evenemang.py](fetch/sources/evenemang.py) → tabellen `evenemang`, ersätts helt vid varje hämtning.
-  Kortet har flikarna Idag, Imorgon och I helgen; 8 visas, resten under "Visa n till".
+  Kortet visar de 3 närmaste stora evenemangen. Idag/Imorgon/I helgen är hopfällda med antal på knapparna; ett tryck
+  fäller ut listan (5 visas, resten under "Visa n till"), samma knapp igen fäller ihop.
 
 ### Sport
 - **Fotboll och NHL** från ESPN:s inofficiella API (`site.api.espn.com/apis/site/v2/sports/...`, ingen nyckel, CORS

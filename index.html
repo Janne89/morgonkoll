@@ -307,6 +307,7 @@
   .evtitel { font-weight: 600; }
   .evtitel, .evenemangtitel { overflow-wrap: anywhere; }
   #evenemang .evenemangsflikar { margin: 12px 0 4px; }
+  #evenemang .evenemangsflikar .antal { opacity: 0.7; margin-left: 2px; font-variant-numeric: tabular-nums; }
   .evenemang { padding: 5px 0; border-bottom: 1px solid var(--linje); }
   .evenemang:last-child { border-bottom: 0; }
   .evenemangtitel a, .evtitel a { color: inherit; text-decoration: none; }
@@ -1504,7 +1505,7 @@ const EVENEMANGSKATEGORIER = {
   "Exhibitions": "Utställningar", "Clubs & Parties": "Klubb & fest", "Festivals": "Festivaler",
   "Sports & Wellbeing": "Sport & hälsa", "Science & Tech": "Vetenskap & teknik", "Careers & Leadership": "Karriär",
 };
-const ANTAL_STORA = 4, ANTAL_EVENEMANG = 8;
+const ANTAL_STORA = 3, ANTAL_EVENEMANG = 5;
 
 // Dagarna för flikarna: idag, imorgon och kommande helg (lör–sön, eller resten av helgen om det redan är helg).
 function evenemangsdagar() {
@@ -1524,9 +1525,10 @@ async function visaEvenemang() {
     const stora = rader.filter(r => r.stort).slice(0, ANTAL_STORA);
     const korta = rader.filter(r => !r.stort);
     const dagar = evenemangsdagar();
-    let flik = "idag";
-    try { flik = localStorage.getItem("evenemangsflik") || "idag"; } catch {}
-    if (!dagar[flik]) flik = "idag";
+    // Ingen flik vald = hopfällt; knapparna visar bara antal.
+    let flik = null;
+    const pagar = d => korta.filter(r => r.start <= d && d <= r.slut);
+    const forDagar = k => [...new Map(dagar[k].flatMap(pagar).map(r => [r.id, r])).values()];
 
     const evenemangsrad = r => {
       const titel = r.lank ? `<a href="${esc(r.lank)}" target="_blank" rel="noopener">${esc(r.titel)}</a>` : esc(r.titel);
@@ -1536,9 +1538,8 @@ async function visaEvenemang() {
     };
 
     const rita = () => {
-      const valda = dagar[flik];
       // Ett evenemang hör till dagen om det pågår då (start ≤ dag ≤ slut).
-      const lista = korta.filter(r => valda.some(d => r.start <= d && d <= r.slut));
+      const lista = flik ? forDagar(flik) : [];
       const forsta = lista.slice(0, ANTAL_EVENEMANG), resten = lista.slice(ANTAL_EVENEMANG);
       ruta.innerHTML = `
         ${stora.length ? `<div class="rubrik">Stora evenemang</div>
@@ -1547,13 +1548,12 @@ async function visaEvenemang() {
             <div class="evenemangmeta">${[kortDatum(r.start), r.plats, r.besokare && `${tal(r.besokare, 0)} besökare`].filter(Boolean).map(esc).join(" · ")}</div>
           </div>`).join("")}` : ""}
         <div class="flikar evenemangsflikar">
-          ${[["idag", "Idag"], ["imorgon", "Imorgon"], ["helgen", "I helgen"]].map(([k, t]) => `<button type="button" data-flik="${k}" aria-pressed="${k === flik}">${t}</button>`).join("")}
+          ${[["idag", "Idag"], ["imorgon", "Imorgon"], ["helgen", "I helgen"]].map(([k, t]) => `<button type="button" data-flik="${k}" aria-pressed="${k === flik}" aria-expanded="${k === flik}">${t} <span class="antal">${forDagar(k).length}</span></button>`).join("")}
         </div>
-        ${forsta.length ? forsta.map(evenemangsrad).join("") : `<div class="info">Inga evenemang hittade.</div>`}
+        ${!flik ? "" : forsta.length ? forsta.map(evenemangsrad).join("") : `<div class="info">Inga evenemang hittade.</div>`}
         ${resten.length ? `<details class="hela"><summary>Visa ${resten.length} till</summary>${resten.map(evenemangsrad).join("")}</details>` : ""}`;
       ruta.querySelectorAll("[data-flik]").forEach(b => b.onclick = () => {
-        flik = b.dataset.flik;
-        try { localStorage.setItem("evenemangsflik", flik); } catch {}
+        flik = flik === b.dataset.flik ? null : b.dataset.flik;     // samma knapp igen fäller ihop
         rita();
       });
     };
