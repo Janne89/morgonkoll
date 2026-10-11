@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #bors { order: 2; } #sl { order: 3; } #nyheter { order: 4; } #lunch { order: 5; }
+  #vader { order: 1; } #bors { order: 2; } #sl { order: 3; } #nyheter { order: 4; } #lunch { order: 5; } #systembolaget { order: 6; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -161,6 +161,25 @@
   .avgang .avvikelse { color: var(--accent); margin-left: 4px; cursor: help; }
   .avgang .nar { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .avgang.installd .mal, .avgang.installd .nar { text-decoration: line-through; color: var(--dampad); }
+
+  /* Systembolaget */
+  .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
+  .slapp:last-of-type { border-bottom: 0; }
+  .slapp-topp { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: baseline; }
+  .slapp-datum { font-size: 14px; color: var(--dampad); white-space: nowrap; }
+  .slapp-datum .etikett { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-left: 4px; }
+  .slapp-namn { font-weight: 600; color: inherit; text-decoration: none; min-width: 0; }
+  .slapp-namn:hover { text-decoration: underline; }
+  .slapp-antal { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .slapp-typer, .slapp details { margin-left: 102px; }
+  .slapp-typer { font-size: 14px; color: var(--dampad); }
+  .slapp details.hela summary { margin-top: 2px; font-size: 13px; }
+  .slapp .ratt .namn { color: inherit; text-decoration: none; }
+  @media (max-width: 480px) {
+    .slapp-topp { grid-template-columns: 1fr auto; }
+    .slapp-datum { grid-column: 1 / -1; }
+    .slapp-typer, .slapp details { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
@@ -177,6 +196,7 @@
     <a href="#sl">SL</a>
     <a href="#nyheter">Nyheter</a>
     <a href="#lunch">Lunch</a>
+    <a href="#systembolaget">Systembolaget</a>
   </nav>
 
   <div class="rutnat">
@@ -191,6 +211,12 @@
       <h2>Nyheter</h2>
       <div id="nyheter-innehall">Hämtar rubriker…</div>
       <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a><span class="tid" id="nyheter-tid"></span></div>
+    </section>
+
+    <section class="kort" id="systembolaget">
+      <h2>Släpp · Systembolaget</h2>
+      <div id="systembolaget-innehall">Hämtar släpp…</div>
+      <div class="kalla">Källa: <a href="https://www.systembolaget.se/">Systembolaget</a> (inofficiellt) · säljstart kl 10<span class="tid" id="systembolaget-tid"></span></div>
     </section>
     </div>
 
@@ -539,6 +565,67 @@ async function visaSL() {
   if (resultat.some(r => r.status === "fulfilled")) visaTid("sl-tid", new Date().toISOString());
 }
 
+// --- Systembolaget ---
+
+const ANTAL_SLAPP = 6;
+const KATEGORIORDNING = ["Vin", "Öl", "Sprit", "Cider & blanddrycker", "Alkoholfritt"];
+const kategoriplats = k => (i => i < 0 ? 99 : i)(KATEGORIORDNING.indexOf(k));
+// "Lokalt & Småskaligt" → "lokalt-smaskaligt", som i systembolaget.se/sortiment/...
+const sortimentslank = s => s.toLowerCase().replace(/[åä]/g, "a").replace(/ö/g, "o").replace(/&/g, "").trim().replace(/\s+/g, "-");
+const kronor = v => `${tal(v, v % 1 ? 2 : 0)} kr`;
+
+async function visaSystembolaget() {
+  const ruta = document.getElementById("systembolaget-innehall");
+  try {
+    const idag = lokal(new Date()).datum;
+    const imorgon = lokal(new Date(Date.now() + 864e5)).datum;
+    const produkter = await supabase("systembolaget", `select=*&saljstart=gte.${idag}&order=saljstart,sortiment`);
+    visaTid("systembolaget-tid", senaste(produkter));
+    if (!produkter.length) { ruta.textContent = "Inga släpp de närmaste veckorna."; return; }
+
+    const slapp = new Map();
+    for (const p of produkter) {
+      const nyckel = `${p.saljstart}|${p.sortiment}`;
+      if (!slapp.has(nyckel)) slapp.set(nyckel, { dag: p.saljstart, sortiment: p.sortiment, produkter: [] });
+      slapp.get(nyckel).produkter.push(p);
+    }
+
+    ruta.innerHTML = [...slapp.values()]
+      .sort((a, b) => a.dag.localeCompare(b.dag) || a.sortiment.localeCompare(b.sortiment, "sv"))
+      .slice(0, ANTAL_SLAPP).map(({ dag, sortiment, produkter }) => {
+      const datum = new Date(`${dag}T12:00:00`).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+      const etikett = dag === idag ? "idag" : dag === imorgon ? "imorgon" : "";
+      const perKategori = {};
+      produkter.forEach(p => perKategori[p.kategori || "Övrigt"] = (perKategori[p.kategori || "Övrigt"] || 0) + 1);
+      const typer = Object.entries(perKategori)
+        .sort(([a, x], [b, y]) => kategoriplats(a) - kategoriplats(b) || y - x)
+        .map(([k, n]) => `${esc(k)} ${n}`).join(" · ");
+      const lista = [...produkter]
+        .sort((a, b) => kategoriplats(a.kategori) - kategoriplats(b.kategori) || (a.typ || "").localeCompare(b.typ || "", "sv") || a.pris - b.pris)
+        .map(p => `
+          <div class="ratt">
+            <div>
+              <a class="namn" href="https://www.systembolaget.se/${encodeURIComponent(p.artikelnummer)}/" target="_blank" rel="noopener">${esc(p.namn)}</a>
+              <div class="beskr">${[p.namn2, p.typ, p.land, p.volym_ml && `${tal(p.volym_ml, 0)} ml`].filter(Boolean).map(esc).join(" · ")}</div>
+            </div>
+            <div class="pris">${p.pris != null ? kronor(p.pris) : ""}</div>
+          </div>`).join("");
+      return `
+        <div class="slapp">
+          <div class="slapp-topp">
+            <span class="slapp-datum">${esc(datum)}${etikett ? `<span class="etikett">${etikett}</span>` : ""}</span>
+            <a class="slapp-namn" href="https://www.systembolaget.se/sortiment/${sortimentslank(sortiment)}/?saljstart-fran=${dag}&saljstart-till=${dag}" target="_blank" rel="noopener">${esc(sortiment)}</a>
+            <span class="slapp-antal">${produkter.length} st</span>
+          </div>
+          <div class="slapp-typer">${typer}</div>
+          <details class="hela"><summary>Visa produkter</summary>${lista}</details>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta släpp (${esc(e.message)}).</span>`;
+  }
+}
+
 // --- Börs ---
 
 const tal = (v, dec) => Number(v).toLocaleString("sv-SE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -668,6 +755,7 @@ visaSL();
 visaLunch();
 visaNyheter();
 visaBors();
+visaSystembolaget();
 
 // Nyheter och börs hämtas var 15:e minut – uppdatera sidan i samma takt om den står öppen.
 setInterval(() => {

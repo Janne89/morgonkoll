@@ -52,21 +52,39 @@ create table if not exists bors (
   hamtad         timestamptz not null default now()
 );
 
+-- Kommande släpp på Systembolaget, en rad per produkt. Ersätts helt vid varje hämtning.
+create table if not exists systembolaget (
+  artikelnummer text primary key,
+  namn          text not null,
+  namn2         text,
+  kategori      text,
+  typ           text,
+  land          text,
+  pris          numeric,
+  volym_ml      numeric,
+  sortiment     text not null,
+  saljstart     date not null,
+  hamtad        timestamptz not null default now()
+);
+
 -- RLS: alla (anon) får läsa, ingen får skriva. Hämtningen använder den hemliga
 -- nyckeln (service_role) som går förbi RLS.
 alter table lunch      enable row level security;
 alter table lunch_info enable row level security;
 alter table nyheter    enable row level security;
 alter table bors       enable row level security;
+alter table systembolaget enable row level security;
 
 drop policy if exists "alla får läsa" on lunch;
 drop policy if exists "alla får läsa" on lunch_info;
 drop policy if exists "alla får läsa" on nyheter;
 drop policy if exists "alla får läsa" on bors;
+drop policy if exists "alla får läsa" on systembolaget;
 create policy "alla får läsa" on lunch      for select to anon, authenticated using (true);
 create policy "alla får läsa" on lunch_info for select to anon, authenticated using (true);
 create policy "alla får läsa" on nyheter    for select to anon, authenticated using (true);
 create policy "alla får läsa" on bors       for select to anon, authenticated using (true);
+create policy "alla får läsa" on systembolaget for select to anon, authenticated using (true);
 
-grant select on lunch, lunch_info, nyheter, bors to anon, authenticated;
-grant select, insert, update, delete on lunch, lunch_info, nyheter, bors to service_role;
+grant select on lunch, lunch_info, nyheter, bors, systembolaget to anon, authenticated;
+grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget to service_role;

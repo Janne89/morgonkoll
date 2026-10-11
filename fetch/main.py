@@ -1,7 +1,7 @@
 """Hämtar källorna och skriver till Supabase.
 
     python main.py                 # allt
-    python main.py nyheter bors    # bara vissa delar
+    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget)
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -9,10 +9,11 @@ ut vad som hämtades.
 import json
 import sys
 import traceback
+from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, lunch_battre, nyheter
+from sources import bors, lunch_battre, nyheter, systembolaget
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -61,7 +62,18 @@ def borsdata(db):
         raise RuntimeError("Börs: " + "; ".join(fel))
 
 
-DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata}
+def slapp(db):
+    produkter = systembolaget.hamta()
+    if not produkter:
+        raise RuntimeError("Systembolaget: inga kommande släpp – har API:et ändrats?")
+    antal = Counter((p["saljstart"], p["sortiment"]) for p in produkter)
+    for (dag, sortiment), n in sorted(antal.items()):
+        print(f"  {dag} {sortiment}: {n} produkter")
+    if db:
+        db.ersatt_systembolaget(produkter)
+
+
+DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata, "systembolaget": slapp}
 
 
 def main(namn):

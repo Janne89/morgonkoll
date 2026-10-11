@@ -3,7 +3,7 @@ name: Hämta
 on:
   schedule:
     # Tider i UTC (Stockholm är +1 vintertid, +2 sommartid).
-    # Lunch + allt: vardagsmorgnar. Menyn byts måndag morgon, så vi hämtar flera gånger.
+    # Lunch + allt (även Systembolagets släpp): vardagsmorgnar. Menyn byts måndag morgon, så vi hämtar flera gånger.
     - cron: "17 5-8 * * 1-5"
     # Nyheter + börs: var 15:e minut på vardagar, ungefär 06–22 svensk tid (täcker USA-börsen).
     - cron: "*/15 4-20 * * 1-5"
