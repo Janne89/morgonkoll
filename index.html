@@ -818,8 +818,8 @@ async function supabase(tabell, fraga) {
 }
 
 // Flikar i lunchkortet: [restaurang i tabellen, kort namn]. Länkar = ställen vars meny inte går att hämta.
-const LUNCHSTALLEN = [["Bättre Mat & Bar", "Bättre Mat"], ["Lulu", "Lulu"], ["Ai Ramen Kita", "Ai Ramen"]];
-const LUNCHLANKAR = [["Zaap Thai", "https://www.facebook.com/ZaapThaiFood", "Veckomenyn läggs upp som bild på Facebook"]];
+const LUNCHSTALLEN = [["Bättre Mat & Bar", "Bättre Mat"], ["Lulu", "Lulu"], ["Ai Ramen Kita", "Ai Ramen"], ["Zaap Thai", "Zaap Thai"]];
+const LUNCHLANKAR = [];       // [namn, url, titel] för ställen vars meny bara kan länkas
 
 async function visaLunch() {
   const ruta = document.getElementById("lunch-innehall");
@@ -856,7 +856,7 @@ async function visaLunch() {
         </div>
         <div class="pris">${r.pris ? `${r.pris} kr` : ""}</div>
       </div>`;
-    const lanktext = url => /\.pdf(\?|$)/i.test(url) ? "Meny som PDF" : /\.(png|jpe?g|webp)(\?|$)/i.test(url) ? "Menybild" : "Menyn på webben";
+    const lanktext = url => /\.pdf(\?|$)/i.test(url) ? "Meny som PDF" : /\.(png|jpe?g|webp)(\?|$)/i.test(url) ? "Menybild" : /facebook\.com/.test(url) ? "Veckomenyn på Facebook" : "Menyn på webben";
 
     const block = namn => {
       const m = perRestaurang.get(namn);
