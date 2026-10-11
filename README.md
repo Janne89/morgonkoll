@@ -16,6 +16,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
 | Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
 | Trendar på Google (Sverige) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
+| Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
@@ -32,14 +33,14 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 | Cron (UTC) | Svensk tid (ca) | Kör |
 |---|---|---|
-| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Systembolaget) |
-| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender |
-| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs + trender |
+| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, Systembolaget) |
+| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken |
+| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs + trender + Riksbanken |
 | manuellt (Run workflow) | – | allt |
 
 - GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
 - Två körningar körs aldrig samtidigt (`concurrency`).
-- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender]` – utan argument körs allt.
+- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken]` – utan argument körs allt.
   Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
 - Varje körning raderar data äldre än 7 dagar (för att hålla sig inom Supabase gratisnivå).
 
@@ -48,7 +49,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 ```
 GitHub Pages (index.html)
    ├─ Väder (SMHI), SL-avgångar och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
-   └─ Lunch, nyheter, börs, trender, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
+   └─ Lunch, nyheter, börs, trender, Riksbanken, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
    └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
@@ -122,6 +123,14 @@ GitHub Actions (se schema ovan)
 - [fetch/sources/trender.py](fetch/sources/trender.py) → tabellen `trender` (de 15 första), som ersätts helt
   vid varje hämtning. Kortet visar de 10 första; sökordet länkar till en Google-sökning, raden under till artikeln.
 
+### Riksbanken – styrränta och räntebesked
+- Styrräntan: serien `SECBREPOEFF` i `api.riksbank.se/swea/v1`. Senaste ändringen räknas fram ur serien.
+- Kommande räntebesked läses från [kalendersidan](https://www.riksbank.se/sv/press-och-publicerat/kalender/)
+  (raderna "Publicering av penningpolitiskt beslut") – inget API eller ics finns, så det kan gå sönder om sidan byggs om.
+- Pressmeddelanden: `riksbank.se/sv/rss/pressmeddelanden/`, filtrerat på styrränta/penningpolitik (de 3 senaste).
+- [fetch/sources/riksbanken.py](fetch/sources/riksbanken.py) → tabellen `riksbanken` (en rad). Fel i kalender eller
+  RSS stoppar inte räntan; då behålls förra hämtningens värden.
+
 ### Systembolaget – släpp
 - Inget öppet API finns längre (gamla `api-portal.systembolaget.se` är nedlagd). Vi använder samma sök-API
   som webbplatsen: `api-extern.systembolaget.se/sb-api-ecommerce/v1/productsearch/search` med
@@ -139,7 +148,8 @@ i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
 - **Löptempo:** fyll i två av distans, tid och tempo/hastighet så räknas resten ut. Ändrar man något räknas
   ett tomt eller uträknat fält om; har man själv fyllt i både distans och tid ändras tiden (distansen behålls).
   Koden ligger i `startaTempo()` i [index.html](index.html).
-- **Ränta:** lån och ränta → räntekostnad per månad och år, och efter ränteavdrag (30 % på upp till
+- **Ränta:** överst styrräntan (senaste ändring), nästa räntebesked och Riksbankens senaste penningpolitiska
+  pressmeddelanden. Sedan räknaren: lån och ränta → räntekostnad per månad och år, och efter ränteavdrag (30 % på upp till
   100 000 kr ränta per år och person, 21 % därutöver – `RANTEAVDRAG` i [index.html](index.html)).
   Bara ränta, ingen amortering. Koden ligger i `startaRanta()`.
 

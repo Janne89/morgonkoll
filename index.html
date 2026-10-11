@@ -175,13 +175,23 @@
 
   /* Verktyg – hopfällt och diskret */
   section.kort#verktyg { padding: 12px 18px; }
-  #verktyg summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
-  #verktyg summary::-webkit-details-marker { display: none; }
-  #verktyg summary h2 { margin: 0; }
-  #verktyg summary::after { content: "▸"; font-size: 12px; color: var(--dampad); }
-  #verktyg details[open] > summary { margin-bottom: 10px; }
-  #verktyg details[open] > summary::after { content: "▾"; }
+  #verktyg > details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  #verktyg > details > summary::-webkit-details-marker { display: none; }
+  #verktyg > details > summary h2 { margin: 0; }
+  #verktyg > details > summary::after { content: "▸"; font-size: 12px; color: var(--dampad); }
+  #verktyg > details[open] > summary { margin-bottom: 10px; }
+  #verktyg > details[open] > summary::after { content: "▾"; }
   #verktyg .flikar { margin: 0 0 10px; }
+  .styrranta { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--linje); }
+  .styrranta .rad { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+  .styrranta .stor strong { font-size: 20px; }
+  .styrranta .avdrag { font-size: 14px; color: var(--dampad); }
+  .styrranta .besked { margin-top: 6px; font-size: 15px; }
+  .styrranta .nyhet .meta { font-size: 12px; }
+  .styrranta .besked strong { color: var(--accent); }
+  .styrranta details.hela summary { font-size: 13px; }
+  .styrranta .nyhet { padding: 6px 0; }
+  .styrranta .kalla { margin-top: 6px; }
   .ranteresultat { margin-top: 12px; border-top: 1px solid var(--linje); padding-top: 8px; }
   .ranteresultat .rad { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-variant-numeric: tabular-nums; }
   .ranteresultat .stor strong { font-size: 20px; }
@@ -312,6 +322,11 @@
         <div class="verktyg-fot"><span>Fyll i två – resten räknas ut. Tid: h:mm:ss, mm:ss eller minuter.</span><button type="button" id="tempo-rensa">Rensa</button></div>
         </div>
         <div data-panel="ranta" hidden>
+          <div class="styrranta">
+            <div id="styrranta">Hämtar styrräntan…</div>
+            <div class="kalla">Källa: <a href="https://www.riksbank.se/sv/press-och-publicerat/kalender/">Riksbanken</a><span class="tid" id="styrranta-tid"></span></div>
+          </div>
+          <div class="rubrik">Räntekostnad</div>
           <div class="formular">
             <label for="ranta-lan">Lån</label>
             <input id="ranta-lan" inputmode="numeric" autocomplete="off" placeholder="2 500 000">
@@ -884,6 +899,42 @@ function startaRanta() {
   rakna();
 }
 
+// --- Verktyg: styrräntan ---
+
+const kortDatum = (iso, ar) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("sv-SE",
+  { weekday: ar ? undefined : "short", day: "numeric", month: "short", year: ar ? "numeric" : undefined });
+
+async function visaStyrranta() {
+  const ruta = document.getElementById("styrranta");
+  try {
+    const [rad] = await supabase("riksbanken", "select=*&id=eq.styrranta");
+    if (!rad) { ruta.textContent = "Styrräntan är inte hämtad än."; return; }
+    const procent = v => `${tal(v, 2)} %`;
+    const andring = rad.forra_styrranta != null && rad.andrad
+      ? `${rad.styrranta < rad.forra_styrranta ? "Sänkt" : "Höjd"} från ${procent(rad.forra_styrranta)} den ${kortDatum(rad.andrad, true)}`
+      : "";
+    const idag = lokal(new Date()).datum;
+    const kommande = (rad.kommande || []).filter(b => b.datum >= idag);
+    const dagarTill = d => Math.round((new Date(`${d}T12:00:00`) - new Date(`${idag}T12:00:00`)) / 864e5);
+    const nar = d => { const n = dagarTill(d); return n === 0 ? "idag" : n === 1 ? "imorgon" : `om ${n} dagar`; };
+    const nasta = kommande[0];
+    ruta.innerHTML = `
+      <div class="rad stor"><span>Styrränta</span><strong>${procent(rad.styrranta)}</strong></div>
+      ${andring ? `<div class="avdrag">${esc(andring)}</div>` : ""}
+      ${nasta ? `
+        <div class="besked">Nästa räntebesked <strong>${nar(nasta.datum)}</strong> · ${esc(kortDatum(nasta.datum))} 09:30</div>
+        ${kommande.length > 1 ? `<div class="avdrag">Därefter ${kommande.slice(1, 3).map(b => esc(kortDatum(b.datum))).join(", ")}</div>` : ""}` : ""}
+      ${(rad.nyheter || []).length ? `
+        <details class="hela"><summary>Senaste från Riksbanken</summary>
+          ${rad.nyheter.map(n => `<a class="nyhet" href="${esc(n.lank)}" target="_blank" rel="noopener">
+            <div class="meta">${esc(kortDatum(n.publicerad, true))}</div><div class="rubriktext">${esc(n.rubrik)}</div></a>`).join("")}
+        </details>` : ""}`;
+    visaTid("styrranta-tid", rad.hamtad);
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta styrräntan (${esc(e.message)}).</span>`;
+  }
+}
+
 function startaVerktyg() {
   const ruta = document.getElementById("verktyg");
   const details = ruta.querySelector("details");
@@ -903,6 +954,7 @@ function startaVerktyg() {
 
   startaTempo();
   startaRanta();
+  visaStyrranta();
 }
 
 // --- Börs ---
@@ -1045,6 +1097,7 @@ setInterval(() => {
   visaNyheter();
   visaTrender();
   visaBors();
+  visaStyrranta();
 }, 15 * 60e3);
 
 // Avgångarna ändras hela tiden – uppdatera varje minut när fliken syns.

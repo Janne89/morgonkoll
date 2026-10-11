@@ -1,7 +1,7 @@
 """Hämtar källorna och skriver till Supabase.
 
     python main.py                 # allt
-    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender)
+    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender, riksbanken)
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, lunch_battre, nyheter, systembolaget, trender
+from sources import bors, lunch_battre, nyheter, riksbanken, systembolaget, trender
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -84,8 +84,20 @@ def googletrender(db):
         db.ersatt_alla("trender", rader, "sokord")
 
 
+def styrranta(db):
+    rad = riksbanken.hamta()
+    print(f"Riksbanken: styrränta {rad['styrranta']} % ({rad['datum']}), "
+          f"ändrad {rad['andrad']} från {rad['forra_styrranta']} %")
+    for b in rad.get("kommande", []):
+        print(f"  besked {b['datum']}")
+    for n in rad.get("nyheter", []):
+        print(f"  {n['publicerad'][:10]} {n['rubrik']}")
+    if db:
+        db.upsert("riksbanken", [rad], "id")
+
+
 DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata,
-         "systembolaget": slapp, "trender": googletrender}
+         "systembolaget": slapp, "trender": googletrender, "riksbanken": styrranta}
 
 
 def main(namn):
