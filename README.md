@@ -269,6 +269,12 @@ i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
   årets snitt, "i dag" som senaste månaden. Anropet skickas som `text/plain` så att ingen CORS-förfrågan behövs.
   Koden ligger i `startaInflation()`.
 
+## Claude Code och Supabase (MCP)
+[.mcp.json](.mcp.json) kopplar Claude Code till Supabase-projektet via
+[Supabase MCP](https://github.com/supabase-community/supabase-mcp), så att SQL-ändringar och felsökning kan göras
+direkt. Kräver Node.js och en personlig åtkomsttoken (begränsad till projektet, med utgångsdatum) i
+miljövariabeln `SUPABASE_ACCESS_TOKEN` – själva token ligger aldrig i repot.
+
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
   `lunch_battre.py`, och lägg till den i `LUNCHKALLOR` i [fetch/main.py](fetch/main.py).
