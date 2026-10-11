@@ -335,7 +335,14 @@
   .prisavlasning { font-size: 13px; color: var(--dampad); min-height: 1.4em; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
   /* Sport */
-  #sport .sportfilter { margin: -4px 0 8px; }
+  #sport .ligval { margin: -4px 0 8px; }
+  #sport .ligval summary { cursor: pointer; list-style: none; font-size: 14px; color: var(--dampad); }
+  #sport .ligval summary::-webkit-details-marker { display: none; }
+  #sport .ligval .etikett { color: var(--text); font-weight: 600; }
+  #sport .ligval .andra { color: var(--accent); margin-left: 4px; }
+  #sport .ligval .andra::after { content: " ▸"; }
+  #sport .ligval[open] .andra::after { content: " ▾"; }
+  #sport .sportfilter { margin: 8px 0 0; }
   #sport .sportfilter button { font-size: 12px; padding: 2px 9px; }
   .sportdag { font-weight: 600; margin-top: 4px; }
   .sportliga { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dampad); margin: 10px 0 2px; }
@@ -1669,17 +1676,23 @@ async function visaSport() {
   const dagens = unika.filter(m => lokal(m.start).datum === idag), gardagens = unika.filter(m => lokal(m.start).datum === igar);
   const fel = [fotboll, nhl, shl].filter(r => r.status === "rejected").map(r => r.reason.message);
 
+  // Ligavalet är en inställning: hopfällt visar det bara de valda ligorna, öppet alla tolv.
+  let ligvalOppet = false;
   const rita = () => {
     const idagHtml = matchlista(dagens, valda), igarHtml = matchlista(gardagens, valda);
     const antalIgar = gardagens.filter(m => valda.has(m.liga)).length;
+    const valdaNamn = SPORTLIGOR.filter(([k]) => valda.has(k)).map(([, n]) => n).join(", ") || "inga valda";
     ruta.innerHTML = `
-      <div class="flikar sportfilter">${SPORTLIGOR.map(([k, n]) => `<button type="button" data-liga="${k}" aria-pressed="${valda.has(k)}">${esc(n)}</button>`).join("")}</div>
+      <details class="ligval"${ligvalOppet ? " open" : ""}><summary><span class="etikett">Ligor:</span> ${esc(valdaNamn)} <span class="andra">ändra</span></summary>
+        <div class="flikar sportfilter">${SPORTLIGOR.map(([k, n]) => `<button type="button" data-liga="${k}" aria-pressed="${valda.has(k)}">${esc(n)}</button>`).join("")}</div>
+      </details>
       <div class="sportdag">Idag</div>
       ${idagHtml || `<div class="info">Inga matcher idag i de valda ligorna.</div>`}
       ${antalIgar ? `<details class="hela"><summary>Igår (${antalIgar} ${antalIgar === 1 ? "match" : "matcher"})</summary>${igarHtml}</details>` : ""}
       ${fel.length ? `<div class="info">Kunde inte hämta allt (${esc(fel.join(", "))}).</div>` : ""}
       ${tabellsektion(valda)}`;
     kopplaTabell(ruta);
+    ruta.querySelector(".ligval").ontoggle = e => { ligvalOppet = e.target.open; };
     ruta.querySelectorAll("[data-liga]").forEach(b => b.onclick = () => {
       valda.has(b.dataset.liga) ? valda.delete(b.dataset.liga) : valda.add(b.dataset.liga);
       try { localStorage.setItem("sportligor", JSON.stringify([...valda])); } catch {}
@@ -1863,7 +1876,7 @@ async function visaPolymarket() {
 
 // --- Systembolaget ---
 
-const ANTAL_SLAPP = 6;
+const ANTAL_SLAPP = 6, SYNLIGA_SLAPP = 2;   // de närmaste syns, resten under "Fler släpp"
 const KATEGORIORDNING = ["Vin", "Öl", "Sprit", "Cider & blanddrycker", "Alkoholfritt"];
 const kategoriplats = k => (i => i < 0 ? 99 : i)(KATEGORIORDNING.indexOf(k));
 // "Lokalt & Småskaligt" → "lokalt-smaskaligt", som i systembolaget.se/sortiment/...
@@ -1886,7 +1899,7 @@ async function visaSystembolaget() {
       slapp.get(nyckel).produkter.push(p);
     }
 
-    ruta.innerHTML = [...slapp.values()]
+    const rader = [...slapp.values()]
       .sort((a, b) => a.dag.localeCompare(b.dag) || a.sortiment.localeCompare(b.sortiment, "sv"))
       .slice(0, ANTAL_SLAPP).map(({ dag, sortiment, produkter }) => {
       const datum = new Date(`${dag}T12:00:00`).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
@@ -1916,7 +1929,10 @@ async function visaSystembolaget() {
           <div class="slapp-typer">${typer}</div>
           <details class="hela"><summary>Visa produkter</summary>${lista}</details>
         </div>`;
-    }).join("");
+    });
+    const fler = rader.slice(SYNLIGA_SLAPP);
+    ruta.innerHTML = rader.slice(0, SYNLIGA_SLAPP).join("")
+      + (fler.length ? `<details class="hela fler-slapp"><summary>Fler släpp (${fler.length})</summary>${fler.join("")}</details>` : "");
   } catch (e) {
     ruta.innerHTML = `<span class="fel">Kunde inte hämta släpp (${esc(e.message)}).</span>`;
   }
