@@ -1,6 +1,6 @@
 # Morgonkoll
 
-Daglig morgonöversikt för mig och kollegorna: väder, SL-avgångar, börs, nyheter, lunch, Systembolagets släpp och dagens namnsdag på en sida.
+Daglig morgonöversikt för mig och kollegorna: väder, SL-avgångar, börs, nyheter, Google-trender, lunch, Systembolagets släpp och dagens namnsdag på en sida.
 
 Live: https://janne89.github.io/morgonkoll/
 
@@ -15,6 +15,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
 | Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Trendar på Google (Sverige) | [Google Trends](https://trends.google.com/trending?geo=SE) RSS | GitHub Actions → Supabase | Med nyheterna |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
@@ -22,7 +23,7 @@ Varje kort visar diskret i källraden när datan senast hämtades. Står sidan �
 väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
 
 **Varför två vägar?** SMHI, SL och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
-SVT, Di, Yahoo, Riksbanken och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
+SVT, Di, Yahoo, Riksbanken, Google Trends och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
 av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
 
 ## Schema (GitHub Actions)
@@ -31,14 +32,14 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 | Cron (UTC) | Svensk tid (ca) | Kör |
 |---|---|---|
-| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, Systembolaget) |
-| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs |
-| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs |
+| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Systembolaget) |
+| `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender |
+| `0 6-20 * * 0,6` | helger 07–21 vinter / 08–22 sommar, varje timme | nyheter + börs + trender |
 | manuellt (Run workflow) | – | allt |
 
 - GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
 - Två körningar körs aldrig samtidigt (`concurrency`).
-- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget]` – utan argument körs allt.
+- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender]` – utan argument körs allt.
   Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
 - Varje körning raderar data äldre än 7 dagar (för att hålla sig inom Supabase gratisnivå).
 
@@ -47,7 +48,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 ```
 GitHub Pages (index.html)
    ├─ Väder (SMHI), SL-avgångar och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
-   └─ Lunch, nyheter, börs, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
+   └─ Lunch, nyheter, börs, trender, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
    └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
@@ -109,6 +110,13 @@ GitHub Actions (se schema ovan)
 - `pdftotext -layout` (poppler) ger bäst resultat – pypdf slår ihop ord. Installeras bara i lunchkörningar.
 - [fetch/sources/lunch_battre.py](fetch/sources/lunch_battre.py) → tabellerna `lunch` (en rad per rätt)
   och `lunch_info`. Veckans rader ersätts vid varje hämtning.
+
+### Trendar på Google
+- `https://trends.google.com/trending/rss?geo=SE` – de ~10 senaste trenderna med ungefärligt antal
+  sökningar (`approx_traffic`, t.ex. "500+") och nyhetsartiklar. Vi sparar den första artikeln som förklaring.
+  (Gamla adressen `.../trends/trendingsearches/daily/rss` är nedlagd.)
+- [fetch/sources/trender.py](fetch/sources/trender.py) → tabellen `trender`, som ersätts helt vid varje hämtning.
+  Kortet sorterar på antal sökningar; sökordet länkar till en Google-sökning, raden under till artikeln.
 
 ### Systembolaget – släpp
 - Inget öppet API finns längre (gamla `api-portal.systembolaget.se` är nedlagd). Vi använder samma sök-API

@@ -1,7 +1,7 @@
 """Hämtar källorna och skriver till Supabase.
 
     python main.py                 # allt
-    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget)
+    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender)
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, lunch_battre, nyheter, systembolaget
+from sources import bors, lunch_battre, nyheter, systembolaget, trender
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -70,10 +70,22 @@ def slapp(db):
     for (dag, sortiment), n in sorted(antal.items()):
         print(f"  {dag} {sortiment}: {n} produkter")
     if db:
-        db.ersatt_systembolaget(produkter)
+        db.ersatt_alla("systembolaget", produkter, "artikelnummer")
 
 
-DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata, "systembolaget": slapp}
+def googletrender(db):
+    rader = trender.hamta()
+    print(f"Google Trends: {len(rader)} sökord")
+    for t in rader:
+        print(f"  {t['trafik'] or '':>6} {t['sokord']} – {t['nyhet_rubrik'] or ''}")
+    if not rader:
+        raise RuntimeError("Google Trends: tomt flöde – har formatet ändrats?")
+    if db:
+        db.ersatt_alla("trender", rader, "sokord")
+
+
+DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata,
+         "systembolaget": slapp, "trender": googletrender}
 
 
 def main(namn):

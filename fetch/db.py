@@ -53,10 +53,10 @@ class Databas:
                                     "hamtad": datetime.now(timezone.utc).isoformat()}],
                     "restaurang,ar,vecka")
 
-    def ersatt_systembolaget(self, rader):
-        """Byter ut alla släpp mot de nyss hämtade (inställda produkter försvinner)."""
-        self._anrop("DELETE", "systembolaget", params={"artikelnummer": "not.is.null"})
-        self.upsert("systembolaget", rader, "artikelnummer")
+    def ersatt_alla(self, tabell, rader, nyckel):
+        """Byter ut hela tabellens innehåll mot de nyss hämtade raderna."""
+        self._anrop("DELETE", tabell, params={nyckel: "not.is.null"})
+        self.upsert(tabell, rader, nyckel)
 
     def upsert(self, tabell, rader, nyckel):
         if rader:

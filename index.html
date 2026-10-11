@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #sl { order: 4; } #lunch { order: 5; } #systembolaget { order: 6; }
+  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #trender { order: 4; } #sl { order: 5; } #lunch { order: 6; } #systembolaget { order: 7; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -164,6 +164,15 @@
   .avgang .nar { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .avgang.installd .mal, .avgang.installd .nar { text-decoration: line-through; color: var(--dampad); }
 
+  /* Trender */
+  .trend { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 7px 0; border-bottom: 1px solid var(--linje); }
+  .trend:last-child { border-bottom: 0; }
+  .trend .sokord { font-weight: 600; color: inherit; text-decoration: none; }
+  .trend .sokord:hover { text-decoration: underline; }
+  .trend .trafik { font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .trend .forklaring { grid-column: 1 / -1; font-size: 14px; color: var(--dampad); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .trend a.forklaring:hover { text-decoration: underline; }
+
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
   .slapp:last-of-type { border-bottom: 0; }
@@ -196,6 +205,7 @@
     <a href="#vader">Väder</a>
     <a href="#bors">Börs</a>
     <a href="#nyheter">Nyheter</a>
+    <a href="#trender">Trender</a>
     <a href="#sl">SL</a>
     <a href="#lunch">Lunch</a>
     <a href="#systembolaget">Systembolaget</a>
@@ -213,6 +223,12 @@
       <h2>Nyheter</h2>
       <div id="nyheter-innehall">Hämtar rubriker…</div>
       <div class="kalla">Källor: <a href="https://www.svt.se/nyheter/">SVT Nyheter</a>, <a href="https://www.di.se/">Dagens industri</a> · AI: OpenAI, Anthropic, Google, TechCrunch, The Verge<span class="tid" id="nyheter-tid"></span></div>
+    </section>
+
+    <section class="kort" id="trender">
+      <h2>Trendar på Google · Sverige</h2>
+      <div id="trender-innehall">Hämtar trender…</div>
+      <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> (ungefärligt antal sökningar)<span class="tid" id="trender-tid"></span></div>
     </section>
 
     <section class="kort" id="systembolaget">
@@ -585,6 +601,31 @@ async function visaSL() {
   if (resultat.some(r => r.status === "fulfilled")) visaTid("sl-tid", new Date().toISOString());
 }
 
+// --- Google Trends ---
+
+async function visaTrender() {
+  const ruta = document.getElementById("trender-innehall");
+  try {
+    const trender = await supabase("trender", "select=*&order=trafik_tal.desc,publicerad.desc");
+    visaTid("trender-tid", senaste(trender));
+    if (!trender.length) { ruta.textContent = "Inga trender hämtade än."; return; }
+    ruta.innerHTML = trender.map(t => {
+      const sokord = t.sokord[0].toUpperCase() + t.sokord.slice(1);
+      const forklaring = t.nyhet_rubrik ? `${esc(t.nyhet_rubrik)}${t.nyhet_kalla ? ` · ${esc(t.nyhet_kalla)}` : ""}` : "";
+      return `
+        <div class="trend">
+          <a class="sokord" href="https://www.google.com/search?q=${encodeURIComponent(t.sokord)}" target="_blank" rel="noopener">${esc(sokord)}</a>
+          <span class="trafik">${esc(t.trafik || "")}</span>
+          ${forklaring ? (t.nyhet_lank
+            ? `<a class="forklaring" href="${esc(t.nyhet_lank)}" target="_blank" rel="noopener" title="${forklaring}">${forklaring}</a>`
+            : `<span class="forklaring">${forklaring}</span>`) : ""}
+        </div>`;
+    }).join("");
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta trender (${esc(e.message)}).</span>`;
+  }
+}
+
 // --- Systembolaget ---
 
 const ANTAL_SLAPP = 6;
@@ -774,6 +815,7 @@ visaVader();
 visaSL();
 visaLunch();
 visaNyheter();
+visaTrender();
 visaBors();
 visaSystembolaget();
 
@@ -782,6 +824,7 @@ setInterval(() => {
   if (document.visibilityState !== "visible") return;
   visaVader();
   visaNyheter();
+  visaTrender();
   visaBors();
 }, 15 * 60e3);
 
