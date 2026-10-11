@@ -14,6 +14,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Vädervarningar (gul/orange/röd) för Stockholms län | [SMHI](https://www.smhi.se/) öppna varnings-API | I webbläsaren | När sidan öppnas och var 15:e min |
 | Störningar på SL-linjerna | [SL Deviations API](https://www.trafiklab.se/api/our-apis/sl/deviations/) | I webbläsaren | Med avgångarna, högst var 5:e min |
 | Soluppgång, solnedgång, dagslängd | Uträknat i webbläsaren (SunCalc-algoritmen) | – | – |
+| Dagens prisjämförelse (en vara per dag mot KPI) | [SCB](https://www.scb.se/) KPI per varugrupp | I webbläsaren | När sidan öppnas (SCB publicerar en gång i månaden) |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -84,6 +85,13 @@ GitHub Actions (se schema ovan)
 ### Soltider
 - Räknas i webbläsaren för Stockholm (59,33 N, 18,07 E) med SunCalc-algoritmen; visas i sidhuvudet med dagslängd
   och skillnad mot i går.
+
+### Dagens prisjämförelse
+- SCB-tabellen `KPI2020COICOPM` (KPI per varugrupp, index 2020 = 100), de senaste 140 månaderna för varorna i
+  `PRISVAROR` i [index.html](index.html) plus totalen (`00`). Samma vara för alla hela dagen (dagnummer modulo antal
+  varor), pilarna bläddrar. Visar ändring sedan 2020 och senaste året jämfört med alla priser, och ett diagram.
+- Ny vara: en rad i `PRISVAROR` med COICOP-koden (se SCB-tabellens varugrupper) och namn, ev. ett kortare namn
+  för diagrammet.
 
 ### Elpris
 - `https://www.elprisetjustnu.se/api/v1/prices/ÅÅÅÅ/MM-DD_SE3.json` – spotpris per kvart, exkl. moms.

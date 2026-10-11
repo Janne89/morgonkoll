@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #sl { order: 6; } #lunch { order: 7; } #systembolaget { order: 8; } #verktyg { order: 9; }
+  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #systembolaget { order: 9; } #verktyg { order: 10; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -256,6 +256,28 @@
   .verktyg-fot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--dampad); }
   .verktyg-fot button { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; }
 
+  /* Dagens prisjämförelse */
+  .pristopp { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .prisvara { font-size: 18px; font-weight: 600; }
+  .prisbladdra { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dampad); font-variant-numeric: tabular-nums; }
+  .prisbladdra button { font: inherit; font-size: 16px; line-height: 1; width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--linje); background: none; color: var(--text); cursor: pointer; }
+  .prisstor { margin: 4px 0 2px; color: var(--dampad); font-size: 14px; }
+  .prisstor .varde { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .prisrad { font-size: 14px; margin-bottom: 8px; }
+  .prisforklaring { font-size: 12px; color: var(--dampad); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+  .prisforklaring .nyckel { display: inline-block; width: 14px; height: 2px; border-radius: 1px; margin-left: 6px; }
+  .prisforklaring .nyckel:first-child { margin-left: 0; }
+  .nyckel.vara { background: var(--accent); } .nyckel.totalt { background: var(--dampad); }
+  svg.prisdiagram { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+  .prisdiagram path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .prisdiagram .vara { stroke: var(--accent); } .prisdiagram .totalt { stroke: var(--dampad); }
+  .prisdiagram .vara-punkt { fill: var(--accent); stroke: var(--kort); stroke-width: 2; }
+  .prisdiagram .baslinje { stroke: var(--linje); stroke-width: 1; }
+  .prisdiagram .sikte { stroke: var(--dampad); stroke-width: 1; }
+  .prisdiagram .slutetikett { fill: var(--text); font-size: 11px; font-weight: 600; }
+  .prisdiagram .slutetikett.dampad { fill: var(--dampad); font-weight: 400; }
+  .prisavlasning { font-size: 13px; color: var(--dampad); min-height: 1.4em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
   .slapp:last-of-type { border-bottom: 0; }
@@ -320,6 +342,12 @@
       <h2>Trendar på Google · Sverige</h2>
       <div id="trender-innehall">Hämtar trender…</div>
       <div class="kalla">Källa: <a href="https://trends.google.com/trending?geo=SE">Google Trends</a> · senaste 24 h, ungefärligt antal sökningar<span class="tid" id="trender-tid"></span></div>
+    </section>
+
+    <section class="kort" id="priser">
+      <h2>Dagens prisjämförelse</h2>
+      <div id="priser-innehall">Hämtar priser…</div>
+      <div class="kalla">Källa: <a href="https://www.scb.se/hitta-statistik/statistik-efter-amne/priser-och-konsumtion/konsumentprisindex/konsumentprisindex-kpi/">SCB, KPI per varugrupp</a> · <span id="priser-manad"></span></div>
     </section>
 
     <section class="kort" id="systembolaget">
@@ -1085,6 +1113,131 @@ function prisniva(snitt, vecka) {
   return `<div class="elniva"><strong>${pil} ${ord}</strong> jämfört med senaste veckan · veckosnitt ${ore(vecka)}${procent}</div>`;
 }
 
+// --- Dagens prisjämförelse (KPI per varugrupp, SCB) ---
+
+const SCB_VAROR = "https://api.scb.se/OV0104/v1/doris/sv/ssd/PR/PR0101/PR0101A/KPI2020COICOPM";
+// Varugrupp i KPI (COICOP) → namn i kortet (och kortare namn i diagrammet). En vara per dag, i den här ordningen.
+const PRISVAROR = [
+  ["01.2.2.0", "Kaffe"], ["07.2.2.2", "Bensin"], ["11.1.1.1", "Restaurangbesök", "Restaurang"], ["01.1.5.2", "Smör"],
+  ["04.5.1.0", "El"], ["01.1.8.5", "Choklad"], ["13.1.3.1", "Frisör"], ["02.1.3.0", "Öl"],
+  ["07.3.3.2", "Utrikesflyg"], ["01.1.4.8", "Ägg"], ["08.3.9.2", "Streamingtjänster", "Streaming"], ["01.1.4.5", "Ost"],
+  ["04.1.1.0", "Hyra"], ["07.2.2.1", "Diesel"], ["01.1.8.6", "Glass"], ["11.1.1.2", "Snabbmat och kaféer", "Snabbmat"],
+  ["09.6.1.0", "Bio, teater och konsert", "Bio & teater"], ["01.1.8.1", "Socker"], ["07.3.1.1", "Tågresor"], ["02.1.2.1", "Vin"],
+  ["12.1.4.1", "Bilförsäkring"], ["01.1.1.4", "Frukostflingor", "Flingor"], ["07.3.3.1", "Inrikesflyg"], ["02.3.0", "Tobak"],
+  ["09.2.1.1", "Datorspel"], ["01.1.7.5", "Potatis och rotfrukter", "Potatis"], ["01.1.4.3", "Mjölk och grädde", "Mjölk"],
+];
+const KPI_TOTALT = "00";
+let prisdata = null;      // { kod: [[månad, index], ...] }
+
+async function hamtaPrisdata() {
+  if (prisdata) return prisdata;
+  const fraga = { query: [
+    { code: "VaruTjanstegrupp", selection: { filter: "item", values: [KPI_TOTALT, ...PRISVAROR.map(([k]) => k)] } },
+    { code: "ContentsCode", selection: { filter: "item", values: ["0000080H"] } },      // index, 2020 = 100
+    { code: "Tid", selection: { filter: "top", values: ["140"] } },
+  ], response: { format: "json" } };
+  // text/plain gör anropet "enkelt" (ingen CORS-förfrågan), se inflationsverktyget.
+  const svar = await fetch(SCB_VAROR, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(fraga) });
+  if (!svar.ok) throw new Error(`SCB svarade ${svar.status}`);
+  const data = {};
+  for (const { key: [kod, manad], values: [v] } of (await svar.json()).data) {
+    if (Number(v) > 0) (data[kod] ||= []).push([manad, Number(v)]);
+  }
+  for (const serie of Object.values(data)) serie.sort((a, b) => a[0].localeCompare(b[0]));
+  return prisdata = data;
+}
+
+// Ändring i procent mellan senaste månaden och samma månad ett år tidigare.
+function arsandring(serie) {
+  const [manad, v] = serie.at(-1);
+  const ifjol = serie.find(([m]) => m === `${Number(manad.slice(0, 4)) - 1}${manad.slice(4)}`);
+  return ifjol ? (v / ifjol[1] - 1) * 100 : null;
+}
+const procentAndring = v => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${tal(Math.abs(v), Math.abs(v) < 10 ? 1 : 0)} %`;
+
+function prisdiagram(vara, totalt, namn) {
+  const B = 520, H = 110, hoger = 78, topp = 8, botten = 16;
+  const manader = vara.map(([m]) => m);
+  const tot = new Map(totalt);
+  const varden = [...vara.map(([, v]) => v), ...manader.map(m => tot.get(m)).filter(Boolean), 100];
+  const lag = Math.min(...varden), hog = Math.max(...varden);
+  const x = i => i / (manader.length - 1) * (B - hoger);
+  const y = v => topp + (hog - v) / ((hog - lag) || 1) * (H - topp - botten);
+  const linje = punkter => punkter.map(([i, v], j) => `${j ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const varaPunkter = vara.map(([, v], i) => [i, v]);
+  const totPunkter = manader.map((m, i) => [i, tot.get(m)]).filter(([, v]) => v);
+  const ar = manader.map((m, i) => [m, i]).filter(([m]) => m.endsWith("M01") && Number(m.slice(0, 4)) % 5 === 0);
+  const sistaVara = varaPunkter.at(-1), sistaTot = totPunkter.at(-1);
+  // Slutetiketter: flytta isär om de krockar.
+  let yVara = y(sistaVara[1]), yTot = y(sistaTot[1]);
+  if (Math.abs(yVara - yTot) < 12) { const mitt = (yVara + yTot) / 2, upp = yVara < yTot ? -6 : 6; yVara = mitt + upp; yTot = mitt - upp; }
+  return `<svg class="prisdiagram" viewBox="0 0 ${B} ${H}" role="img" aria-label="${esc(namn)} jämfört med alla priser, index 2020 = 100">
+    <line class="baslinje" x1="0" x2="${B - hoger}" y1="${y(100)}" y2="${y(100)}"/>
+    <text class="axel" x="${B - hoger + 4}" y="${y(100) + 4}">100</text>
+    ${ar.map(([m, i]) => `<text class="axel" x="${x(i)}" y="${H - 2}" text-anchor="middle">${m.slice(0, 4)}</text>`).join("")}
+    <path class="totalt" d="${linje(totPunkter)}"/>
+    <path class="vara" d="${linje(varaPunkter)}"/>
+    <circle class="vara-punkt" cx="${x(sistaVara[0])}" cy="${y(sistaVara[1])}" r="4"/>
+    <text class="slutetikett" x="${x(sistaVara[0]) + 8}" y="${yVara + 4}">${esc(namn)}</text>
+    <text class="slutetikett dampad" x="${x(sistaTot[0]) + 8}" y="${yTot + 4}">Alla priser</text>
+    <line class="sikte" x1="0" x2="0" y1="${topp}" y2="${H - botten}" visibility="hidden"/>
+    <rect class="traffyta" x="0" y="0" width="${B - hoger}" height="${H}" fill="transparent"/>
+  </svg>`;
+}
+
+async function visaPriser(steg = 0) {
+  const ruta = document.getElementById("priser-innehall");
+  try {
+    const data = await hamtaPrisdata();
+    const totalt = data[KPI_TOTALT];
+    const varor = PRISVAROR.filter(([k]) => data[k]?.length > 12);
+    if (!totalt || !varor.length) throw new Error("ingen data");
+    // Samma vara hela dagen för alla; pilarna bläddrar.
+    const dagNr = Math.floor(new Date(`${lokal(new Date()).datum}T12:00:00`) / 864e5);
+    visaPriser.index = ((visaPriser.index ?? dagNr) + steg) % varor.length;
+    if (visaPriser.index < 0) visaPriser.index += varor.length;
+    const [kod, namn, kortnamn = namn] = varor[visaPriser.index];
+    const serie = data[kod];
+    const [manad, index] = serie.at(-1);
+    const totNu = totalt.at(-1)[1];
+    const ar = arsandring(serie), arTot = arsandring(totalt);
+    const jamfor = (v, t) => v - t >= 2 ? "mer än" : t - v >= 2 ? "mindre än" : "ungefär som";
+
+    ruta.innerHTML = `
+      <div class="pristopp">
+        <div class="prisvara">${esc(namn)}</div>
+        <div class="prisbladdra">
+          <button type="button" data-steg="-1" aria-label="Föregående vara">‹</button>
+          <span>${visaPriser.index + 1}/${varor.length}</span>
+          <button type="button" data-steg="1" aria-label="Nästa vara">›</button>
+        </div>
+      </div>
+      <div class="prisstor"><span class="varde">${procentAndring(index - 100)}</span> sedan 2020 <span class="dampad">· alla priser ${procentAndring(totNu - 100)}</span></div>
+      ${ar != null ? `<div class="prisrad">Senaste året ${procentAndring(ar)} – ${jamfor(ar, arTot)} priserna i stort (${procentAndring(arTot)})</div>` : ""}
+      <div class="prisforklaring"><span class="nyckel vara"></span>${esc(namn)} <span class="nyckel totalt"></span>Alla priser (KPI) · index 2020 = 100</div>
+      ${prisdiagram(serie, totalt, kortnamn)}
+      <div class="prisavlasning" aria-live="polite"></div>`;
+    document.getElementById("priser-manad").textContent = manadText(manad);
+
+    ruta.querySelectorAll("[data-steg]").forEach(b => b.onclick = () => visaPriser(Number(b.dataset.steg)));
+    // Hovring: sikte och avläsning för månaden under muspekaren.
+    const svg = ruta.querySelector(".prisdiagram"), sikte = svg.querySelector(".sikte"), avlas = ruta.querySelector(".prisavlasning");
+    const tot = new Map(totalt);
+    const visaManad = (klientX) => {
+      const ruta2 = svg.getBoundingClientRect(), skalaX = 520 / ruta2.width;
+      const i = Math.max(0, Math.min(serie.length - 1, Math.round((klientX - ruta2.left) * skalaX / (520 - 78) * (serie.length - 1))));
+      const xi = i / (serie.length - 1) * (520 - 78);
+      sikte.setAttribute("x1", xi); sikte.setAttribute("x2", xi); sikte.setAttribute("visibility", "visible");
+      const [m, v] = serie[i];
+      avlas.textContent = `${manadText(m)}: ${namn} ${tal(v, 1)} · alla priser ${tal(tot.get(m) ?? NaN, 1)}`;
+    };
+    svg.addEventListener("pointermove", e => visaManad(e.clientX));
+    svg.addEventListener("pointerleave", () => { sikte.setAttribute("visibility", "hidden"); avlas.textContent = ""; });
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta priser från SCB (${esc(e.message)}).</span>`;
+  }
+}
+
 // --- Google Trends ---
 
 const ANTAL_TRENDER = 10;
@@ -1748,6 +1901,7 @@ visaSL();
 visaLunch();
 visaNyheter();
 visaTrender();
+visaPriser();
 visaBors();
 visaSystembolaget();
 
