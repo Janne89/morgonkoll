@@ -134,10 +134,14 @@ GitHub Actions (se schema ovan)
   produkt), som ersätts helt vid varje hämtning. Kortet grupperar per dag och sortiment och räknar per kategori.
 
 ## Verktyg
-Hopfällt kort längst ner (öppet/stängt sparas i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
+Hopfällt kort längst ner med en flik per verktyg (öppet/stängt, vald flik och ifyllda lånevärden sparas
+i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
 - **Löptempo:** fyll i två av distans, tid och tempo/hastighet så räknas resten ut. Ändrar man något räknas
   ett tomt eller uträknat fält om; har man själv fyllt i både distans och tid ändras tiden (distansen behålls).
   Koden ligger i `startaTempo()` i [index.html](index.html).
+- **Ränta:** lån och ränta → räntekostnad per månad och år, och efter ränteavdrag (30 % på upp till
+  100 000 kr ränta per år och person, 21 % därutöver – `RANTEAVDRAG` i [index.html](index.html)).
+  Bara ränta, ingen amortering. Koden ligger i `startaRanta()`.
 
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som

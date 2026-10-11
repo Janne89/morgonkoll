@@ -181,18 +181,22 @@
   #verktyg summary::after { content: "▸"; font-size: 12px; color: var(--dampad); }
   #verktyg details[open] > summary { margin-bottom: 10px; }
   #verktyg details[open] > summary::after { content: "▾"; }
-  #verktyg .rubrik { margin-top: 0; }
-  .tempo { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; }
-  .tempo label { font-size: 14px; color: var(--dampad); }
-  .tempo input { font: inherit; width: 100%; min-width: 0; padding: 4px 8px; border: 1px solid var(--linje); border-radius: 8px; background: var(--bg); color: var(--text); font-variant-numeric: tabular-nums; }
-  .tempo input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
-  .tempo input.raknad { color: var(--accent); font-weight: 600; }
-  .tempo input[aria-invalid="true"] { border-color: var(--ned); }
-  .tempo .enhet { font-size: 13px; color: var(--dampad); min-width: 34px; }
+  #verktyg .flikar { margin: 0 0 10px; }
+  .ranteresultat { margin-top: 12px; border-top: 1px solid var(--linje); padding-top: 8px; }
+  .ranteresultat .rad { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+  .ranteresultat .stor strong { font-size: 20px; }
+  .ranteresultat .avdrag { font-size: 14px; color: var(--dampad); }
+  .formular { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; }
+  .formular label { font-size: 14px; color: var(--dampad); }
+  .formular input { font: inherit; width: 100%; min-width: 0; padding: 4px 8px; border: 1px solid var(--linje); border-radius: 8px; background: var(--bg); color: var(--text); font-variant-numeric: tabular-nums; }
+  .formular input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .formular input.raknad { color: var(--accent); font-weight: 600; }
+  .formular input[aria-invalid="true"] { border-color: var(--ned); }
+  .formular .enhet { font-size: 13px; color: var(--dampad); min-width: 34px; }
   .snabbval { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
   .snabbval button { font-size: 12px; padding: 2px 9px; }
-  .tempo-fot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--dampad); }
-  .tempo-fot button { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; }
+  .verktyg-fot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--dampad); }
+  .verktyg-fot button { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; }
 
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
@@ -280,8 +284,12 @@
     <section class="kort" id="verktyg">
       <details>
         <summary><h2>Verktyg</h2></summary>
-        <div class="rubrik">Löptempo</div>
-        <div class="tempo">
+        <div class="flikar">
+          <button type="button" data-verktyg="tempo" aria-pressed="true">Löptempo</button>
+          <button type="button" data-verktyg="ranta" aria-pressed="false">Ränta</button>
+        </div>
+        <div data-panel="tempo">
+        <div class="formular">
           <label for="tempo-distans">Distans</label>
           <input id="tempo-distans" data-grupp="distans" inputmode="decimal" autocomplete="off" placeholder="10">
           <span class="enhet">km</span>
@@ -301,7 +309,24 @@
           <input id="tempo-hastighet" data-grupp="fart" inputmode="decimal" autocomplete="off" placeholder="12,0">
           <span class="enhet">km/h</span>
         </div>
-        <div class="tempo-fot"><span>Fyll i två – resten räknas ut. Tid: h:mm:ss, mm:ss eller minuter.</span><button type="button" id="tempo-rensa">Rensa</button></div>
+        <div class="verktyg-fot"><span>Fyll i två – resten räknas ut. Tid: h:mm:ss, mm:ss eller minuter.</span><button type="button" id="tempo-rensa">Rensa</button></div>
+        </div>
+        <div data-panel="ranta" hidden>
+          <div class="formular">
+            <label for="ranta-lan">Lån</label>
+            <input id="ranta-lan" inputmode="numeric" autocomplete="off" placeholder="2 500 000">
+            <span class="enhet">kr</span>
+            <label for="ranta-ranta">Ränta</label>
+            <input id="ranta-ranta" inputmode="decimal" autocomplete="off" placeholder="3,25">
+            <span class="enhet">%</span>
+          </div>
+          <div class="ranteresultat">
+            <div class="rad stor"><span>Per månad</span><strong id="ranta-manad">–</strong></div>
+            <div class="rad"><span>Per år</span><span id="ranta-ar">–</span></div>
+            <div class="rad avdrag"><span>Efter ränteavdrag</span><span id="ranta-avdrag">–</span></div>
+          </div>
+          <div class="verktyg-fot"><span>Bara ränta, ingen amortering. Avdrag 30 % på upp till 100 000 kr ränta per år och person, 21 % därutöver.</span></div>
+        </div>
       </details>
     </section>
     </div>
@@ -766,10 +791,6 @@ function startaTempo() {
     tempo: document.getElementById("tempo-tempo"),
     hastighet: document.getElementById("tempo-hastighet"),
   };
-  const details = ruta.querySelector("details");
-  try { details.open = localStorage.getItem("verktyg-oppen") === "1"; } catch {}
-  details.addEventListener("toggle", () => { try { localStorage.setItem("verktyg-oppen", details.open ? "1" : "0"); } catch {} });
-
   // Tre grupper: distans, tid och fart (tempo/hastighet). När en ändras räknas en av de
   // andra om – den som är tom eller uträknad, och annars inte distansen (den behålls).
   const egen = el => el.value.trim() !== "" && !el.classList.contains("raknad");
@@ -826,6 +847,62 @@ function startaTempo() {
   document.getElementById("tempo-rensa").onclick = () => {
     Object.values(falt).forEach(el => { el.value = ""; el.classList.remove("raknad"); el.removeAttribute("aria-invalid"); });
   };
+}
+
+// --- Verktyg: ränta ---
+
+// Ränteavdrag per person och år (kontrollera mot Skatteverket om reglerna ändras).
+const RANTEAVDRAG = { grans: 100000, under: 0.30, over: 0.21 };
+const lasKronor = text => { const t = text.replace(/\s/g, "").replace(",", "."); return t ? (Number(t) > 0 ? Number(t) : NaN) : null; };
+
+function startaRanta() {
+  const lan = document.getElementById("ranta-lan"), ranta = document.getElementById("ranta-ranta");
+  const ut = id => document.getElementById(id);
+  try { lan.value = localStorage.getItem("ranta-lan") || ""; ranta.value = localStorage.getItem("ranta-ranta") || ""; } catch {}
+
+  function rakna() {
+    const belopp = lasKronor(lan.value), procent = lasTal(ranta.value);
+    for (const [el, v] of [[lan, belopp], [ranta, procent]]) {
+      if (Number.isNaN(v)) el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
+    }
+    if (!(belopp > 0 && procent > 0)) { ["ranta-manad", "ranta-ar", "ranta-avdrag"].forEach(id => ut(id).textContent = "–"); return; }
+    const perAr = belopp * procent / 100;
+    const avdrag = Math.min(perAr, RANTEAVDRAG.grans) * RANTEAVDRAG.under + Math.max(perAr - RANTEAVDRAG.grans, 0) * RANTEAVDRAG.over;
+    ut("ranta-manad").textContent = kronor(Math.round(perAr / 12));
+    ut("ranta-ar").textContent = kronor(Math.round(perAr));
+    ut("ranta-avdrag").textContent = `${kronor(Math.round((perAr - avdrag) / 12))}/mån · ${kronor(Math.round(perAr - avdrag))}/år`;
+  }
+
+  for (const el of [lan, ranta]) el.addEventListener("input", () => {
+    try { localStorage.setItem(el.id, el.value); } catch {}
+    rakna();
+  });
+  // Tusentalsavgränsare när man lämnar fältet: 2500000 → 2 500 000.
+  const snygga = () => { const v = lasKronor(lan.value); if (v > 0) lan.value = tal(v, 0); };
+  lan.addEventListener("blur", snygga);
+  snygga();
+  rakna();
+}
+
+function startaVerktyg() {
+  const ruta = document.getElementById("verktyg");
+  const details = ruta.querySelector("details");
+  try { details.open = localStorage.getItem("verktyg-oppen") === "1"; } catch {}
+  details.addEventListener("toggle", () => { try { localStorage.setItem("verktyg-oppen", details.open ? "1" : "0"); } catch {} });
+
+  const knappar = [...ruta.querySelectorAll("[data-verktyg]")];
+  const visa = namn => {
+    knappar.forEach(b => b.setAttribute("aria-pressed", b.dataset.verktyg === namn));
+    ruta.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== namn);
+    try { localStorage.setItem("verktyg", namn); } catch {}
+  };
+  knappar.forEach(b => b.onclick = () => visa(b.dataset.verktyg));
+  let vald = "tempo";
+  try { vald = localStorage.getItem("verktyg") || "tempo"; } catch {}
+  visa(knappar.some(b => b.dataset.verktyg === vald) ? vald : "tempo");
+
+  startaTempo();
+  startaRanta();
 }
 
 // --- Börs ---
@@ -952,7 +1029,7 @@ const datumText = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Sto
 document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${datumText.slice(1)} · vecka ${vecka}`;
 
 visaDagen();
-startaTempo();
+startaVerktyg();
 visaVader();
 visaSL();
 visaLunch();
