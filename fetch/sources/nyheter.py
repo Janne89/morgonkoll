@@ -1,5 +1,6 @@
 """Nyhetsrubriker från RSS- och Atom-flöden. Vi sparar bara rubrik, ingress och länk."""
 import re
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -7,11 +8,16 @@ from html import unescape
 
 import requests
 
-# (källa, url, ämne). Ämnet "ai" hamnar under egen flik på sidan, inte under "Alla".
+# (källa, url, ämne). Ämnet blir flik på sidan; "ai" visas inte under "Alla".
+# Bara källor utan betalvägg (DN Sthlm har mest öppna lokalnyheter).
 FLODEN = [
-    ("SVT", "https://www.svt.se/nyheter/inrikes/rss.xml", "nyheter"),
-    ("SVT", "https://www.svt.se/nyheter/utrikes/rss.xml", "nyheter"),
-    ("Di", "https://www.di.se/rss", "nyheter"),
+    ("SVT", "https://www.svt.se/nyheter/inrikes/rss.xml", "sverige"),
+    ("Ekot", "https://api.sr.se/api/rss/program/83", "sverige"),
+    ("SVT", "https://www.svt.se/nyheter/lokalt/stockholm/rss.xml", "stockholm"),
+    ("DN", "https://www.dn.se/sthlm/rss/", "stockholm"),
+    ("SVT", "https://www.svt.se/nyheter/utrikes/rss.xml", "varlden"),
+    ("BBC", "https://feeds.bbci.co.uk/news/world/rss.xml", "varlden"),
+    ("Di", "https://www.di.se/rss", "ekonomi"),
     ("OpenAI", "https://openai.com/news/rss.xml", "ai"),
     # Anthropic har inget eget flöde – det här skrapas av ett community-projekt på GitHub.
     ("Anthropic", "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml", "ai"),
@@ -72,9 +78,18 @@ def hamta():
     artiklar = {}
     # Sätts på alla rader varje gång, så att sidan kan visa när vi senast hämtade.
     hamtad = datetime.now(timezone.utc).isoformat()
+    fel = []
     for kalla, url, amne in FLODEN:
-        svar = requests.get(url, headers=headers, timeout=30)
-        svar.raise_for_status()
-        for a in tolka(kalla, amne, svar.content):
-            artiklar[a["lank"]] = {**a, "hamtad": hamtad}     # samma artikel kan ligga i flera flöden
+        # Ett trasigt flöde hoppas över så att resten ändå kommer med.
+        try:
+            svar = requests.get(url, headers=headers, timeout=30)
+            svar.raise_for_status()
+            for a in tolka(kalla, amne, svar.content):
+                artiklar[a["lank"]] = {**a, "hamtad": hamtad}     # samma artikel kan ligga i flera flöden
+        except Exception as e:
+            fel.append(f"{kalla} ({url}): {e}")
+    for f in fel:
+        print(f"Nyheter: hoppade över {f}", file=sys.stderr)
+    if not artiklar:
+        raise RuntimeError("Nyheter: inga flöden gick att hämta")
     return list(artiklar.values())

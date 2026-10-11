@@ -23,7 +23,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
 | Valuta: USD/SEK, EUR/SEK | [Riksbanken](https://www.riksbank.se/) öppna API | GitHub Actions → Supabase | Med börsen, men Riksbanken publicerar bara en kurs per bankdag |
-| Nyheter | RSS från [SVT](https://www.svt.se/nyheter/) (inrikes, utrikes) och [Di](https://www.di.se/), AI-flik med OpenAI, Anthropic, Google, TechCrunch och The Verge | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
+| Nyheter | RSS/Atom per ämne: Sverige (SVT inrikes, Ekot), Stockholm (SVT Stockholm, DN Sthlm), Världen (SVT utrikes, BBC), Ekonomi (Di), AI (OpenAI, Anthropic, Google, TechCrunch, The Verge) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger ca 08–22 |
 | Trendar på Google (Sverige, USA, Europa, Asien) | [Google Trends](https://trends.google.com/trending?geo=SE): internt API (inofficiellt) + RSS | GitHub Actions → Supabase | Med nyheterna |
 | Styrräntan, kommande räntebesked, Riksbankens pressmeddelanden (i Verktyg → Ränta) | [Riksbanken](https://www.riksbank.se/): API, kalendersidan och RSS | GitHub Actions → Supabase | Med nyheterna (fångar beskeden 09:30) |
 | Systembolaget: kommande släpp (tillfälligt sortiment, webblanseringar, lokalt & småskaligt m.m.) | systembolaget.se:s sök-API (inofficiellt) | GitHub Actions → Supabase | Med lunchen, vardagsmorgnar |
@@ -33,7 +33,7 @@ Varje kort visar diskret i källraden när datan senast hämtades. Står sidan �
 väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
 
 **Varför två vägar?** SMHI, SL, elprisetjustnu.se och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
-SVT, Di, Yahoo, Riksbanken, Google Trends och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
+Nyhetssajterna, Yahoo, Riksbanken, Google Trends och Systembolaget gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
 av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
 
 ## Schema (GitHub Actions)
@@ -166,9 +166,13 @@ GitHub Actions (se schema ovan)
 - [fetch/sources/bors.py](fetch/sources/bors.py) → tabellen `bors` (en rad per instrument).
   Varje instrument hämtas för sig, så ett fel stoppar inte resten.
 
-### Nyheter – SVT + Dagens industri
-- RSS: `svt.se/nyheter/inrikes/rss.xml`, `svt.se/nyheter/utrikes/rss.xml`, `di.se/rss`
-  (SVT:s allmänna flöde är mest lokalt och sport). Bara rubrik, ingress och länk sparas.
+### Nyheter
+- En flik per ämne (`amne` i tabellen, `NYHETSAMNEN` i [index.html](index.html)): Sverige, Stockholm, Världen, Ekonomi
+  och AI. "Alla" visar allt utom AI. Bara källor utan betalvägg. Ett trasigt flöde hoppas över, resten kommer med.
+  - Sverige: `svt.se/nyheter/inrikes/rss.xml`, Ekot `api.sr.se/api/rss/program/83` (Atom)
+  - Stockholm: `svt.se/nyheter/lokalt/stockholm/rss.xml`, `dn.se/sthlm/rss/`
+  - Världen: `svt.se/nyheter/utrikes/rss.xml`, `feeds.bbci.co.uk/news/world/rss.xml`
+  - Ekonomi: `di.se/rss`
 - AI-fliken (kolumnen `amne = 'ai'`, visas inte under "Alla"):
   - OpenAI: `openai.com/news/rss.xml`. Poster utan kategori (kundcase) hoppas över.
   - Anthropic har inget eget flöde. Vi använder ett som skrapas av community-projektet
