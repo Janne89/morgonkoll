@@ -133,6 +133,12 @@ GitHub Actions (se schema ovan)
 - [fetch/sources/systembolaget.py](fetch/sources/systembolaget.py) → tabellen `systembolaget` (en rad per
   produkt), som ersätts helt vid varje hämtning. Kortet grupperar per dag och sortiment och räknar per kategori.
 
+## Verktyg
+Hopfällt kort längst ner (öppet/stängt sparas i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
+- **Löptempo:** fyll i två av distans, tid och tempo/hastighet så räknas resten ut. Ändrar man något räknas
+  ett tomt eller uträknat fält om; har man själv fyllt i både distans och tid ändras tiden (distansen behålls).
+  Koden ligger i `startaTempo()` i [index.html](index.html).
+
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
   `lunch_battre.py`, och lägg till den i `LUNCHKALLOR` i [fetch/main.py](fetch/main.py).

@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #trender { order: 4; } #sl { order: 5; } #lunch { order: 6; } #systembolaget { order: 7; }
+  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #trender { order: 4; } #sl { order: 5; } #lunch { order: 6; } #systembolaget { order: 7; } #verktyg { order: 8; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -137,7 +137,7 @@
   .flikar { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 6px; }
   .flikar + .flikar { margin-top: 2px; }
   .flikar + .flikar button { font-size: 12px; padding: 2px 9px; }
-  .flikar button { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linje); background: none; color: var(--dampad); cursor: pointer; }
+  .flikar button, .snabbval button { font: inherit; font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linje); background: none; color: var(--dampad); cursor: pointer; }
   .flikar button[aria-pressed="true"] { background: var(--text); color: var(--kort); border-color: var(--text); }
 
   /* Börs */
@@ -172,6 +172,27 @@
   .trend .trafik { font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .trend .forklaring { grid-column: 1 / -1; font-size: 14px; color: var(--dampad); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .trend a.forklaring:hover { text-decoration: underline; }
+
+  /* Verktyg – hopfällt och diskret */
+  section.kort#verktyg { padding: 12px 18px; }
+  #verktyg summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  #verktyg summary::-webkit-details-marker { display: none; }
+  #verktyg summary h2 { margin: 0; }
+  #verktyg summary::after { content: "▸"; font-size: 12px; color: var(--dampad); }
+  #verktyg details[open] > summary { margin-bottom: 10px; }
+  #verktyg details[open] > summary::after { content: "▾"; }
+  #verktyg .rubrik { margin-top: 0; }
+  .tempo { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; }
+  .tempo label { font-size: 14px; color: var(--dampad); }
+  .tempo input { font: inherit; width: 100%; min-width: 0; padding: 4px 8px; border: 1px solid var(--linje); border-radius: 8px; background: var(--bg); color: var(--text); font-variant-numeric: tabular-nums; }
+  .tempo input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .tempo input.raknad { color: var(--accent); font-weight: 600; }
+  .tempo input[aria-invalid="true"] { border-color: var(--ned); }
+  .tempo .enhet { font-size: 13px; color: var(--dampad); min-width: 34px; }
+  .snabbval { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
+  .snabbval button { font-size: 12px; padding: 2px 9px; }
+  .tempo-fot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--dampad); }
+  .tempo-fot button { font: inherit; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; }
 
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
@@ -254,6 +275,34 @@
       <h2>Avgångar · SL</h2>
       <div id="sl-innehall">Hämtar avgångar…</div>
       <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
+    </section>
+
+    <section class="kort" id="verktyg">
+      <details>
+        <summary><h2>Verktyg</h2></summary>
+        <div class="rubrik">Löptempo</div>
+        <div class="tempo">
+          <label for="tempo-distans">Distans</label>
+          <input id="tempo-distans" data-grupp="distans" inputmode="decimal" autocomplete="off" placeholder="10">
+          <span class="enhet">km</span>
+          <div class="snabbval">
+            <button type="button" data-km="5">5 km</button>
+            <button type="button" data-km="10">10 km</button>
+            <button type="button" data-km="21.0975">Halvmara</button>
+            <button type="button" data-km="42.195">Mara</button>
+          </div>
+          <label for="tempo-tid">Tid</label>
+          <input id="tempo-tid" data-grupp="tid" inputmode="decimal" autocomplete="off" placeholder="h:mm:ss">
+          <span class="enhet"></span>
+          <label for="tempo-tempo">Tempo</label>
+          <input id="tempo-tempo" data-grupp="fart" inputmode="decimal" autocomplete="off" placeholder="m:ss">
+          <span class="enhet">/km</span>
+          <label for="tempo-hastighet">Hastighet</label>
+          <input id="tempo-hastighet" data-grupp="fart" inputmode="decimal" autocomplete="off" placeholder="12,0">
+          <span class="enhet">km/h</span>
+        </div>
+        <div class="tempo-fot"><span>Fyll i två – resten räknas ut. Tid: h:mm:ss, mm:ss eller minuter.</span><button type="button" id="tempo-rensa">Rensa</button></div>
+      </details>
     </section>
     </div>
   </div>
@@ -691,6 +740,94 @@ async function visaSystembolaget() {
   }
 }
 
+// --- Verktyg: löptempo ---
+
+// "1:45:30" → h:m:s, "45:30" → m:s, "45" eller "45,5" → minuter. Tomt → null, fel → NaN.
+function lasTid(text) {
+  const t = text.trim().replace(",", ".");
+  if (!t) return null;
+  const delar = t.split(":").map(d => d === "" ? NaN : Number(d));
+  if (delar.length > 3 || delar.some(d => !(d >= 0))) return NaN;
+  return delar.reduce((summa, d) => summa * 60 + d, 0) * (delar.length === 1 ? 60 : 1);
+}
+const lasTal = text => { const t = text.trim().replace(",", "."); return t ? (Number(t) > 0 ? Number(t) : NaN) : null; };
+function skrivTid(sek) {
+  sek = Math.round(sek);
+  const h = Math.floor(sek / 3600), m = Math.floor(sek % 3600 / 60), s = String(sek % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+const skrivDec = (v, max) => v.toLocaleString("sv-SE", { maximumFractionDigits: max, useGrouping: false });
+
+function startaTempo() {
+  const ruta = document.getElementById("verktyg");
+  const falt = {
+    distans: document.getElementById("tempo-distans"),
+    tid: document.getElementById("tempo-tid"),
+    tempo: document.getElementById("tempo-tempo"),
+    hastighet: document.getElementById("tempo-hastighet"),
+  };
+  const details = ruta.querySelector("details");
+  try { details.open = localStorage.getItem("verktyg-oppen") === "1"; } catch {}
+  details.addEventListener("toggle", () => { try { localStorage.setItem("verktyg-oppen", details.open ? "1" : "0"); } catch {} });
+
+  // Tre grupper: distans, tid och fart (tempo/hastighet). När en ändras räknas en av de
+  // andra om – den som är tom eller uträknad, och annars inte distansen (den behålls).
+  const egen = el => el.value.trim() !== "" && !el.classList.contains("raknad");
+  const ifylld = g => g === "fart" ? egen(falt.tempo) || egen(falt.hastighet) : egen(falt[g]);
+  const satt = (el, varde) => { el.value = varde; el.classList.add("raknad"); el.removeAttribute("aria-invalid"); };
+
+  function las() {
+    const v = {
+      distans: lasTal(falt.distans.value),
+      tid: lasTid(falt.tid.value),
+      tempo: lasTid(falt.tempo.value),     // sekunder per km
+    };
+    const fel = { ...v, hastighet: lasTal(falt.hastighet.value) };
+    for (const [namn, varde] of Object.entries(fel)) {
+      if (Number.isNaN(varde) || varde === 0) falt[namn].setAttribute("aria-invalid", "true");
+      else falt[namn].removeAttribute("aria-invalid");
+    }
+    return v;
+  }
+
+  function rakna(andrad) {
+    const { distans, tid, tempo } = las();
+    const giltig = { distans: distans > 0, tid: tid > 0, fart: tempo > 0 };
+    const andra = ["distans", "tid", "fart"].filter(g => g !== andrad);
+    const lediga = andra.filter(g => !ifylld(g));
+    const mal = lediga.length === 1 ? lediga[0] : lediga.length === 0 ? andra.find(g => g !== "distans") : null;
+    if (!mal || ["distans", "tid", "fart"].some(g => g !== mal && !giltig[g])) return;
+    if (mal === "distans") satt(falt.distans, skrivDec(tid / tempo, 2));
+    if (mal === "tid") satt(falt.tid, skrivTid(distans * tempo));
+    if (mal === "fart") {
+      satt(falt.tempo, skrivTid(tid / distans));
+      satt(falt.hastighet, skrivDec(distans / (tid / 3600), 1));
+    }
+  }
+
+  function andrad(el) {
+    el.classList.remove("raknad");
+    // Tempo och hastighet är samma sak – håll dem i takt.
+    if (el === falt.tempo) {
+      const p = lasTid(el.value);
+      if (p > 0) satt(falt.hastighet, skrivDec(3600 / p, 1));
+    } else if (el === falt.hastighet) {
+      const v = lasTal(el.value);
+      if (v > 0) satt(falt.tempo, skrivTid(3600 / v));
+    }
+    rakna(el.dataset.grupp);
+  }
+
+  Object.values(falt).forEach(el => el.addEventListener("input", () => andrad(el)));
+  ruta.querySelectorAll("[data-km]").forEach(b => b.onclick = () => {
+    falt.distans.value = skrivDec(Number(b.dataset.km), 4);
+    andrad(falt.distans);
+  });
+  document.getElementById("tempo-rensa").onclick = () => {
+    Object.values(falt).forEach(el => { el.value = ""; el.classList.remove("raknad"); el.removeAttribute("aria-invalid"); });
+  };
+}
+
 // --- Börs ---
 
 const tal = (v, dec) => Number(v).toLocaleString("sv-SE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -815,6 +952,7 @@ const datumText = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Sto
 document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${datumText.slice(1)} · vecka ${vecka}`;
 
 visaDagen();
+startaTempo();
 visaVader();
 visaSL();
 visaLunch();
