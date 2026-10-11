@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #sl { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #lunch { order: 5; }
+  #vader { order: 1; } #bors { order: 2; } #sl { order: 3; } #nyheter { order: 4; } #lunch { order: 5; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -173,8 +173,8 @@
 
   <nav class="hopp" aria-label="Hoppa till">
     <a href="#vader">Väder</a>
-    <a href="#sl">SL</a>
     <a href="#bors">Börs</a>
+    <a href="#sl">SL</a>
     <a href="#nyheter">Nyheter</a>
     <a href="#lunch">Lunch</a>
   </nav>
@@ -195,12 +195,6 @@
     </div>
 
     <div class="kolumn hoger">
-    <section class="kort" id="sl">
-      <h2>Avgångar · SL</h2>
-      <div id="sl-innehall">Hämtar avgångar…</div>
-      <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
-    </section>
-
     <section class="kort" id="lunch">
       <h2>Lunch</h2>
       <div id="lunch-innehall">Hämtar menyer…</div>
@@ -210,6 +204,12 @@
       <h2>Börs &amp; valuta</h2>
       <div id="bors-innehall">Hämtar kurser…</div>
       <div class="kalla">Index, råvaror, bitcoin: Yahoo Finance (fördröjt) · Valuta: <a href="https://www.riksbank.se/">Riksbanken</a><span class="tid" id="bors-tid"></span></div>
+    </section>
+
+    <section class="kort" id="sl">
+      <h2>Avgångar · SL</h2>
+      <div id="sl-innehall">Hämtar avgångar…</div>
+      <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
     </section>
     </div>
   </div>
