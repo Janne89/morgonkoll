@@ -1,6 +1,6 @@
 # Morgonkoll
 
-Daglig morgonöversikt för mig och kollegorna: väder, börs, nyheter, lunch och dagens namnsdag på en sida.
+Daglig morgonöversikt för mig och kollegorna: väder, SL-avgångar, börs, nyheter, lunch och dagens namnsdag på en sida.
 
 Live: https://janne89.github.io/morgonkoll/
 
@@ -9,6 +9,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Kort | Källa | Hämtas | Uppdateras |
 |---|---|---|---|
 | Väder | [SMHI](https://www.smhi.se/) öppna prognos-API | I webbläsaren | Varje gång sidan öppnas (SMHI gör ny prognos ungefär varje timme) |
+| SL-avgångar: Arenan, Solna station | [SL Transport API](https://www.trafiklab.se/api/our-apis/sl/transport/) (öppet, ingen nyckel) | I webbläsaren | Varje minut medan fliken syns (realtid) |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -17,9 +18,9 @@ Live: https://janne89.github.io/morgonkoll/
 | Lunch: Bättre Mat & Bar, Gärdet | Veckomeny-PDF på [battremat.com](https://www.battremat.com/kopia-p%C3%A5-b%C3%A4ttre-mat-bar-g%C3%A4rdet) | GitHub Actions → Supabase | Vardagar en gång i timmen, 06:17–09:17 (vintertid) / 07:17–10:17 (sommartid) |
 
 Varje kort visar diskret i källraden när datan senast hämtades. Står sidan öppen hämtar den
-väder, nyheter och börs på nytt var 15:e minut (bara när fliken syns).
+väder, nyheter och börs på nytt var 15:e minut och SL-avgångarna varje minut (bara när fliken syns).
 
-**Varför två vägar?** SMHI och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
+**Varför två vägar?** SMHI, SL och Svenska dagar tillåter anrop direkt från webbläsaren (CORS).
 SVT, Di, Yahoo och Riksbanken gör det inte, och lunchen kräver PDF-tolkning – de hämtas därför
 av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser från.
 
@@ -44,7 +45,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 ```
 GitHub Pages (index.html)
-   ├─ Väder (SMHI) och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
+   ├─ Väder (SMHI), SL-avgångar och dagens namnsdag/helgdag (Svenska dagar): direkt i webbläsaren
    └─ Lunch, nyheter, börs: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
@@ -67,6 +68,13 @@ GitHub Actions (se schema ovan)
 - Licens CC BY 4.0 – SMHI anges som källa. (Open-Meteo valdes bort: bara gratis för icke-kommersiellt bruk.)
 - Timvärden: `air_temperature`, `precipitation_amount_mean`, `probability_of_precipitation`,
   `wind_speed`, `symbol_code` (Wsymb2, 1–27). Kortet visar nuläge, 16 timmar framåt och 5 dagar.
+
+### SL-avgångar
+- `https://transport.integration.sl.se/v1/sites/<id>/departures?forecast=60` – realtid, öppen CORS, ingen nyckel.
+- Hållplatserna ligger i `HALLPLATSER` i [index.html](index.html). ID slås upp i
+  `https://transport.integration.sl.se/v1/sites` (Arenan = 3555, Solna station = 9509).
+- Kortet visar de `ANTAL_AVGANGAR` närmaste avgångarna per hållplats, med spår/läge,
+  ⚠ vid störning (meddelandet syns när man håller musen över) och överstruket om turen är inställd.
 
 ### Namnsdag och speciella dagar
 - `https://sholiday.faboul.se/dagar/v2.1/ÅÅÅÅ/MM/DD` ger namnsdag, helgdag och flaggdag.
@@ -104,3 +112,5 @@ GitHub Actions (se schema ovan)
   `ordning` i `visaBors()` i [index.html](index.html) för att bestämma plats
   (och i `visning` om den behöver enhet eller decimaler).
 - **Temadag:** en rad i `TEMADAGAR` i [index.html](index.html).
+- **SL-hållplats:** en rad i `HALLPLATSER` i [index.html](index.html). Valfritt `linjer: ["40", "41"]`
+  och `riktning: 1` eller `2` för att bara visa vissa linjer eller ena hållet.

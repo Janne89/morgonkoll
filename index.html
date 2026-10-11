@@ -18,6 +18,10 @@
     --markering: #fbeee6;
     --upp: #1a7f45;
     --ned: #c0352b;
+    --tag: #c2457f;
+    --buss: #c0352b;
+    --sparvag: #7a6a58;
+    --tunnelbana: #2e6fb5;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -32,6 +36,10 @@
       --markering: #3a2a22;
       --upp: #4cc27e;
       --ned: #f07167;
+      --tag: #b33d74;
+      --buss: #b8352d;
+      --sparvag: #7d6e5d;
+      --tunnelbana: #2f6db0;
     }
   }
   * { box-sizing: border-box; }
@@ -51,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #bors { order: 2; } #nyheter { order: 3; } #lunch { order: 4; }
+  #vader { order: 1; } #sl { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #lunch { order: 5; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -138,6 +146,21 @@
   .instrument .forandring { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; min-width: 70px; }
   .upp { color: var(--upp); } .ned { color: var(--ned); }
   svg.minidiagram { width: 72px; height: 28px; display: block; }
+
+  /* SL */
+  .hallplats + .hallplats { margin-top: 14px; }
+  .hallplats .rubrik { margin-top: 0; }
+  .avgang { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--linje); }
+  .avgang:last-child { border-bottom: 0; }
+  .avgang .linje { font-size: 13px; font-weight: 700; text-align: center; color: #fff; border-radius: 6px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .linje.TRAIN { background: var(--tag); } .linje.BUS { background: var(--buss); }
+  .linje.TRAM { background: var(--sparvag); } .linje.METRO { background: var(--tunnelbana); }
+  .linje.SHIP, .linje.FERRY { background: var(--dampad); }
+  .avgang .mal { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .avgang .lage { font-size: 12px; color: var(--dampad); margin-left: 6px; }
+  .avgang .avvikelse { color: var(--accent); margin-left: 4px; cursor: help; }
+  .avgang .nar { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .avgang.installd .mal, .avgang.installd .nar { text-decoration: line-through; color: var(--dampad); }
 </style>
 </head>
 <body>
@@ -150,6 +173,7 @@
 
   <nav class="hopp" aria-label="Hoppa till">
     <a href="#vader">Väder</a>
+    <a href="#sl">SL</a>
     <a href="#bors">Börs</a>
     <a href="#nyheter">Nyheter</a>
     <a href="#lunch">Lunch</a>
@@ -171,6 +195,12 @@
     </div>
 
     <div class="kolumn hoger">
+    <section class="kort" id="sl">
+      <h2>Avgångar · SL</h2>
+      <div id="sl-innehall">Hämtar avgångar…</div>
+      <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
+    </section>
+
     <section class="kort" id="lunch">
       <h2>Lunch</h2>
       <div id="lunch-innehall">Hämtar menyer…</div>
@@ -462,6 +492,53 @@ async function visaNyheter() {
   }
 }
 
+// --- SL ---
+
+// Hållplats-ID slås upp via https://transport.integration.sl.se/v1/sites
+// Valfria filter per hållplats: linjer: ["40", "41"], riktning: 1 eller 2 (direction_code).
+const HALLPLATSER = [
+  { id: 3555, namn: "Arenan" },
+  { id: 9509, namn: "Solna station" },
+];
+const ANTAL_AVGANGAR = 6;
+const LAGE = { TRAIN: "spår", TRAM: "spår", METRO: "spår", BUS: "läge" };
+
+async function hamtaAvgangar(h) {
+  const svar = await fetch(`https://transport.integration.sl.se/v1/sites/${h.id}/departures?forecast=60`);
+  if (!svar.ok) throw new Error(`SL svarade ${svar.status}`);
+  const { departures } = await svar.json();
+  return departures
+    .filter(a => !h.linjer || h.linjer.includes(a.line.designation))
+    .filter(a => !h.riktning || a.direction_code === h.riktning)
+    .sort((a, b) => (a.expected || a.scheduled).localeCompare(b.expected || b.scheduled))
+    .slice(0, ANTAL_AVGANGAR);
+}
+
+function avgangsrad(a) {
+  const installd = a.state === "CANCELLED";
+  const lage = a.stop_point?.designation && LAGE[a.line.transport_mode];
+  const avvikelser = (a.deviations || []).map(d => d.message).filter(Boolean);
+  return `
+    <div class="avgang${installd ? " installd" : ""}">
+      <span class="linje ${esc(a.line.transport_mode)}">${esc(a.line.designation)}</span>
+      <span class="mal">${esc(a.destination)}${lage ? `<span class="lage">${lage} ${esc(a.stop_point.designation)}</span>` : ""}${avvikelser.length ? `<span class="avvikelse" title="${esc(avvikelser.join("\n"))}">⚠</span>` : ""}</span>
+      <span class="nar">${installd ? "Inställd" : esc(a.display)}</span>
+    </div>`;
+}
+
+async function visaSL() {
+  const ruta = document.getElementById("sl-innehall");
+  const resultat = await Promise.allSettled(HALLPLATSER.map(hamtaAvgangar));
+  ruta.innerHTML = HALLPLATSER.map((h, i) => {
+    const r = resultat[i];
+    const innehall = r.status === "rejected"
+      ? `<span class="fel">Kunde inte hämta avgångar (${esc(r.reason.message)}).</span>`
+      : r.value.length ? r.value.map(avgangsrad).join("") : `<div class="info">Inga avgångar närmaste timmen.</div>`;
+    return `<div class="hallplats"><div class="rubrik">${esc(h.namn)}</div>${innehall}</div>`;
+  }).join("");
+  if (resultat.some(r => r.status === "fulfilled")) visaTid("sl-tid", new Date().toISOString());
+}
+
 // --- Börs ---
 
 const tal = (v, dec) => Number(v).toLocaleString("sv-SE", { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -587,6 +664,7 @@ document.getElementById("datum").textContent = `${datumText[0].toUpperCase()}${d
 
 visaDagen();
 visaVader();
+visaSL();
 visaLunch();
 visaNyheter();
 visaBors();
@@ -598,6 +676,11 @@ setInterval(() => {
   visaNyheter();
   visaBors();
 }, 15 * 60e3);
+
+// Avgångarna ändras hela tiden – uppdatera varje minut när fliken syns.
+setInterval(() => {
+  if (document.visibilityState === "visible") visaSL();
+}, 60e3);
 </script>
 </body>
 </html>
