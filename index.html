@@ -193,6 +193,7 @@
   .styrranta .nyhet { padding: 6px 0; }
   .styrranta .kalla { margin-top: 6px; }
   .ranteresultat { margin-top: 12px; border-top: 1px solid var(--linje); padding-top: 8px; }
+  .ranteresultat .avdrag + details.hela summary { margin-top: 4px; }
   .ranteresultat .rad { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-variant-numeric: tabular-nums; }
   .ranteresultat .stor strong { font-size: 20px; }
   .ranteresultat .avdrag { font-size: 14px; color: var(--dampad); }
@@ -202,6 +203,13 @@
   .formular input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .formular input.raknad { color: var(--accent); font-weight: 600; }
   .formular input[aria-invalid="true"] { border-color: var(--ned); }
+  .formular select { font: inherit; width: 100%; min-width: 0; padding: 4px 6px; border: 1px solid var(--linje); border-radius: 8px; background: var(--bg); color: var(--text); }
+  .formular select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .formular .grupp { display: contents; }
+  .formular .grupp[hidden] { display: none; }
+  .skattedelar { margin-top: 6px; font-size: 14px; }
+  .skattedelar .rad { display: flex; justify-content: space-between; padding: 2px 0; font-variant-numeric: tabular-nums; }
+  .skattedelar .summa { border-top: 1px solid var(--linje); margin-top: 2px; padding-top: 4px; font-weight: 600; }
   .formular .enhet { font-size: 13px; color: var(--dampad); min-width: 34px; }
   .snabbval { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: -2px; }
   .snabbval button { font-size: 12px; padding: 2px 9px; }
@@ -297,6 +305,7 @@
         <div class="flikar">
           <button type="button" data-verktyg="tempo" aria-pressed="true">Löptempo</button>
           <button type="button" data-verktyg="ranta" aria-pressed="false">Ränta</button>
+          <button type="button" data-verktyg="lon" aria-pressed="false">Lön</button>
         </div>
         <div data-panel="tempo">
         <div class="formular">
@@ -341,6 +350,41 @@
             <div class="rad avdrag"><span>Efter ränteavdrag</span><span id="ranta-avdrag">–</span></div>
           </div>
           <div class="verktyg-fot"><span>Bara ränta, ingen amortering. Avdrag 30 % på upp till 100 000 kr ränta per år och person, 21 % därutöver.</span></div>
+        </div>
+        <div data-panel="lon" hidden>
+          <div class="formular">
+            <label for="lon-lon">Månadslön</label>
+            <input id="lon-lon" inputmode="numeric" autocomplete="off" placeholder="45 000">
+            <span class="enhet">kr</span>
+            <label for="lon-kommun">Kommun</label>
+            <select id="lon-kommun"><option value="">Hämtar kommuner…</option></select>
+            <span class="enhet"></span>
+            <label for="lon-samfund">Trossamfund</label>
+            <select id="lon-samfund">
+              <option value="ingen">Inte medlem</option>
+              <option value="svenska">Svenska kyrkan</option>
+              <option value="annat">Annat trossamfund</option>
+            </select>
+            <span class="enhet"></span>
+            <div class="grupp" id="lon-rad-forsamling" hidden>
+              <label for="lon-forsamling">Församling</label>
+              <select id="lon-forsamling"></select>
+              <span class="enhet"></span>
+            </div>
+            <div class="grupp" id="lon-rad-avgift" hidden>
+              <label for="lon-avgift">Avgift</label>
+              <input id="lon-avgift" inputmode="decimal" autocomplete="off" placeholder="1,0">
+              <span class="enhet">%</span>
+            </div>
+            <label for="lon-alder">Ålder</label>
+            <select id="lon-alder">
+              <option value="under66">Under 66 år</option>
+              <option value="over66">66 år eller äldre</option>
+            </select>
+            <span class="enhet"></span>
+          </div>
+          <div class="ranteresultat" id="lon-resultat"></div>
+          <div class="verktyg-fot"><span>Skatteverkets skattetabell för året – det arbetsgivaren drar varje månad. Slutlig skatt kan skilja något.</span></div>
         </div>
       </details>
     </section>
@@ -935,26 +979,210 @@ async function visaStyrranta() {
   }
 }
 
+// --- Verktyg: lön efter skatt ---
+
+// Skatteverkets öppna data (CORS tillåtet): skattesatser per församling och skattetabeller.
+const SKV = "https://skatteverket.entryscape.net/rowstore/dataset/";
+const SKV_SATSER = SKV + "c67b320b-ffee-4876-b073-dd9236cd2a99";
+const SKV_TABELLER = SKV + "88320397-5c32-4c16-ae79-d36d95b17b95";
+const LON_KOLUMN = { under66: "kolumn 1", over66: "kolumn 3" };
+
+async function skvAlla(url, fraga) {
+  const rader = [];
+  for (let offset = 0; ; offset += 500) {
+    const svar = await fetch(`${url}?${new URLSearchParams({ ...fraga, _limit: 500, _offset: offset })}`);
+    if (!svar.ok) throw new Error(`Skatteverket svarade ${svar.status}`);
+    const data = await svar.json();
+    rader.push(...data.results);
+    if (offset + 500 >= data.resultCount) return rader;
+  }
+}
+
+// "UPPLANDS VÄSBY" → "Upplands Väsby", "MALUNG-SÄLEN" → "Malung-Sälen".
+const versaler = t => t.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (_, f, b) => f + b.toUpperCase());
+const procentTal = v => Number(String(v).replace(",", "."));
+
+let skattesatser = null;            // { ar, kommuner: { namn: [rader] } }
+const skattetabeller = {};          // "2026-32" → sorterade rader
+
+async function hamtaSkattesatser() {
+  if (skattesatser) return skattesatser;
+  const ar = Number(lokal(new Date()).datum.slice(0, 4));
+  // I december kan nästa års satser saknas – ta i så fall årets.
+  for (const forsok of [ar, ar - 1]) {
+    const rader = await skvAlla(SKV_SATSER, { "år": forsok });
+    if (!rader.length) continue;
+    const kommuner = {};
+    for (const r of rader) (kommuner[r.kommun] ||= []).push(r);
+    return skattesatser = { ar: forsok, kommuner };
+  }
+  throw new Error("inga skattesatser");
+}
+
+async function hamtaSkattetabell(ar, nr) {
+  const nyckel = `${ar}-${nr}`;
+  if (!skattetabeller[nyckel]) {
+    const rader = await skvAlla(SKV_TABELLER, { "år": ar, tabellnr: nr });
+    skattetabeller[nyckel] = rader
+      .map(r => ({ ...r, fran: Number(r["inkomst fr.o.m."]), till: Number(r["inkomst t.o.m."]) || Infinity }))
+      .sort((a, b) => a.fran - b.fran);
+  }
+  return skattetabeller[nyckel];
+}
+
+// Månadsskatt enligt tabellen. Upp till 80 000 kr står beloppet i kronor ("30B"),
+// därovan som procent av lönen ("30%").
+function tabellskatt(tabell, lon, kolumn) {
+  const rad = tabell.find(r => lon >= r.fran && lon <= r.till) || tabell.at(-1);
+  const varde = Number(rad[kolumn]);
+  return rad["antal dgr"] === "30%" ? Math.round(lon * varde / 100) : varde;
+}
+
+// Brytpunkten för statlig skatt syns i tabellen som ett hopp på 20 procentenheter i marginalskatten.
+function brytpunkt(tabell, kolumn) {
+  const rader = tabell.filter(r => r["antal dgr"] === "30B" && r.fran >= 30000);
+  for (let i = 1; i < rader.length; i++) {
+    const marginal = (j) => (Number(rader[j][kolumn]) - Number(rader[j - 1][kolumn])) / (rader[j].fran - rader[j - 1].fran);
+    if (i > 1 && marginal(i) - marginal(i - 1) > 0.1) {
+      const andel = Math.min(1, (marginal(i) - marginal(i - 1)) / 0.2);
+      return Math.round((rader[i - 1].fran + (rader[i].fran - rader[i - 1].fran) * (1 - andel)) / 100) * 100;
+    }
+  }
+  return null;
+}
+
+function startaLon() {
+  const f = id => document.getElementById("lon-" + id);
+  const [lon, kommun, samfund, forsamling, avgift, alder, ut] =
+    ["lon", "kommun", "samfund", "forsamling", "avgift", "alder", "resultat"].map(f);
+  const spara = () => { try { for (const el of [lon, kommun, samfund, forsamling, avgift, alder]) localStorage.setItem(el.id, el.value); } catch {} };
+  const sparat = id => { try { return localStorage.getItem(id) || ""; } catch { return ""; } };
+  let laddad = false;
+
+  async function ladda() {
+    if (laddad) return;
+    laddad = true;
+    try {
+      const { kommuner } = await hamtaSkattesatser();
+      kommun.innerHTML = `<option value="">Välj kommun…</option>` + Object.keys(kommuner).sort((a, b) => a.localeCompare(b, "sv"))
+        .map(k => `<option value="${esc(k)}">${esc(versaler(k))}</option>`).join("");
+      kommun.value = sparat("lon-kommun");
+      samfund.value = sparat("lon-samfund") || "ingen";
+      alder.value = sparat("lon-alder") || "under66";
+      avgift.value = sparat("lon-avgift");
+      lon.value = sparat("lon-lon");
+      fyllForsamlingar();
+      forsamling.value = sparat("lon-forsamling") || forsamling.value;
+      rakna();
+    } catch (e) {
+      laddad = false;
+      ut.innerHTML = `<span class="fel">Kunde inte hämta skattesatser (${esc(e.message)}).</span>`;
+    }
+  }
+
+  function fyllForsamlingar() {
+    const rader = skattesatser?.kommuner[kommun.value] || [];
+    forsamling.innerHTML = rader.map(r => `<option value="${esc(r["församling"])}">${esc(versaler(r["församling"]))} (${tal(procentTal(r.kyrkoavgift), 2)} %)</option>`).join("");
+    f("rad-forsamling").hidden = samfund.value !== "svenska";
+    f("rad-avgift").hidden = samfund.value !== "annat";
+  }
+
+  let senaste = 0;
+  async function rakna() {
+    const brutto = lasKronor(lon.value);
+    if (Number.isNaN(brutto)) lon.setAttribute("aria-invalid", "true"); else lon.removeAttribute("aria-invalid");
+    const rader = skattesatser?.kommuner[kommun.value];
+    if (!(brutto > 0) || !rader) { ut.innerHTML = `<div class="info">Fyll i lön och kommun.</div>`; return; }
+
+    const sats = samfund.value === "svenska" ? rader.find(r => r["församling"] === forsamling.value) || rader[0] : rader[0];
+    const delar = [
+      ["Kommunalskatt", procentTal(sats["kommunal-skatt"])],
+      ["Regionskatt", procentTal(sats["landstings-skatt"])],
+      ["Begravningsavgift", procentTal(sats["begravnings-avgift"])],
+    ];
+    if (samfund.value === "svenska") delar.push(["Kyrkoavgift", procentTal(sats.kyrkoavgift)]);
+    if (samfund.value === "annat") {
+      const a = lasTal(avgift.value);
+      if (Number.isNaN(a)) avgift.setAttribute("aria-invalid", "true"); else avgift.removeAttribute("aria-invalid");
+      if (a > 0) delar.push(["Avgift trossamfund", a]);
+    }
+    const total = delar.reduce((s, [, v]) => s + v, 0);
+    // Tabellerna finns för hela procent (29–42); skattesatsen avrundas till närmaste.
+    const nr = Math.min(42, Math.max(29, Math.round(total)));
+    const kolumn = LON_KOLUMN[alder.value] || LON_KOLUMN.under66;
+
+    const anrop = ++senaste;
+    ut.innerHTML = `<div class="info">Räknar…</div>`;
+    let tabell;
+    try { tabell = await hamtaSkattetabell(skattesatser.ar, nr); }
+    catch (e) { ut.innerHTML = `<span class="fel">Kunde inte hämta skattetabell ${nr} (${esc(e.message)}).</span>`; return; }
+    if (anrop !== senaste) return;      // en nyare uträkning har startat
+
+    const skatt = tabellskatt(tabell, brutto, kolumn);
+    const netto = brutto - skatt;
+    // Över 80 000 kr anger tabellen bara hela procent av lönen (genomsnitt), så marginalskatten
+    // tas från tabellens översta kronorsdel.
+    const steg = 1000, bas = Math.min(brutto, 79000);
+    const marginal = Math.round((tabellskatt(tabell, bas + steg, kolumn) - tabellskatt(tabell, bas, kolumn)) / steg * 100);
+    const bryt = brytpunkt(tabell, kolumn);
+    const statligt = bryt == null ? "" : brutto <= bryt
+      ? `${kronor(bryt - brutto)} under brytpunkten för statlig skatt (ca ${kronor(bryt)}/mån)`
+      : `${kronor(brutto - bryt)} över brytpunkten (ca ${kronor(bryt)}/mån) – 20 % statlig skatt på det`;
+
+    ut.innerHTML = `
+      <div class="rad stor"><span>Lön efter skatt</span><strong>${kronor(netto)}</strong></div>
+      <div class="rad"><span>Per år</span><span>${kronor(netto * 12)}</span></div>
+      <div class="rad"><span>Skatt</span><span>${kronor(skatt)}/mån · ${tal(skatt / brutto * 100, 1)} %</span></div>
+      <div class="rad"><span>Marginalskatt</span><span>${marginal} %</span></div>
+      ${statligt ? `<div class="avdrag">${esc(statligt)}</div>` : ""}
+      <details class="hela"><summary>Så räknas det</summary>
+        <div class="skattedelar">
+          ${delar.map(([namn, v]) => `<div class="rad"><span>${namn}</span><span>${tal(v, 2)} %</span></div>`).join("")}
+          <div class="rad summa"><span>Skattesats</span><span>${tal(total, 2)} %</span></div>
+        </div>
+        <div class="avdrag">Skattetabell ${nr}, ${kolumn} (${alder.value === "over66" ? "66 år eller äldre vid årets början" : "under 66 år"}), ${skattesatser.ar}.
+          Grundavdrag, jobbskatteavdrag, statlig skatt och pensionsavgift ingår i tabellen.</div>
+      </details>`;
+  }
+
+  for (const el of [lon, kommun, samfund, forsamling, avgift, alder]) {
+    el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
+      if (el === kommun || el === samfund) fyllForsamlingar();
+      spara();
+      rakna();
+    });
+  }
+  lon.addEventListener("blur", () => { const v = lasKronor(lon.value); if (v > 0) lon.value = tal(v, 0); });
+  return ladda;      // anropas när fliken visas, så att inget hämtas i onödan
+}
+
 function startaVerktyg() {
   const ruta = document.getElementById("verktyg");
   const details = ruta.querySelector("details");
   try { details.open = localStorage.getItem("verktyg-oppen") === "1"; } catch {}
   details.addEventListener("toggle", () => { try { localStorage.setItem("verktyg-oppen", details.open ? "1" : "0"); } catch {} });
 
-  const knappar = [...ruta.querySelectorAll("[data-verktyg]")];
-  const visa = namn => {
-    knappar.forEach(b => b.setAttribute("aria-pressed", b.dataset.verktyg === namn));
-    ruta.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== namn);
-    try { localStorage.setItem("verktyg", namn); } catch {}
-  };
-  knappar.forEach(b => b.onclick = () => visa(b.dataset.verktyg));
-  let vald = "tempo";
-  try { vald = localStorage.getItem("verktyg") || "tempo"; } catch {}
-  visa(knappar.some(b => b.dataset.verktyg === vald) ? vald : "tempo");
-
   startaTempo();
   startaRanta();
   visaStyrranta();
+  const laddaLon = startaLon();
+
+  const knappar = [...ruta.querySelectorAll("[data-verktyg]")];
+  let vald = "tempo";
+  // Lönefliken hämtar från Skatteverket – bara när den faktiskt syns.
+  const laddaOmSynlig = () => { if (details.open && vald === "lon") laddaLon(); };
+  const visa = namn => {
+    vald = namn;
+    knappar.forEach(b => b.setAttribute("aria-pressed", b.dataset.verktyg === namn));
+    ruta.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== namn);
+    try { localStorage.setItem("verktyg", namn); } catch {}
+    laddaOmSynlig();
+  };
+  knappar.forEach(b => b.onclick = () => visa(b.dataset.verktyg));
+  details.addEventListener("toggle", laddaOmSynlig);
+  let sparad = "tempo";
+  try { sparad = localStorage.getItem("verktyg") || "tempo"; } catch {}
+  visa(knappar.some(b => b.dataset.verktyg === sparad) ? sparad : "tempo");
 }
 
 // --- Börs ---

@@ -152,6 +152,16 @@ i webbläsaren). Allt räknas i webbläsaren, inget hämtas.
   pressmeddelanden. Sedan räknaren: lån och ränta → räntekostnad per månad och år, och efter ränteavdrag (30 % på upp till
   100 000 kr ränta per år och person, 21 % därutöver – `RANTEAVDRAG` i [index.html](index.html)).
   Bara ränta, ingen amortering. Koden ligger i `startaRanta()`.
+- **Lön:** månadslön, kommun, trossamfund (inte medlem / Svenska kyrkan med församling / annat med egen
+  avgift) och ålder → lön efter skatt, skatt, marginalskatt och avstånd till brytpunkten för statlig skatt.
+  Hämtas direkt från Skatteverkets öppna data (CORS tillåtet, först när fliken visas):
+  - Skattesatser per församling: rowstore `c67b320b-ffee-4876-b073-dd9236cd2a99` (kommunal-, region-,
+    begravnings- och kyrkoavgift). Saknas årets satser används förra årets.
+  - Skattetabeller: rowstore `88320397-5c32-4c16-ae79-d36d95b17b95`. Skattesatsen avrundas till närmaste hela
+    procent (tabell 29–42); kolumn 1 under 66 år, kolumn 3 för 66 år eller äldre. Upp till 80 000 kr/mån
+    står skatten i kronor, därovan som procent av lönen.
+  - Brytpunkten räknas fram ur tabellen (där marginalskatten hoppar 20 procentenheter), så inget hårdkodas.
+  Koden ligger i `startaLon()`.
 
 ## Lägga till en källa
 - **Restaurang:** ny modul i `fetch/sources/` med `hamta()` som returnerar samma form som
