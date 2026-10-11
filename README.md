@@ -77,7 +77,10 @@ GitHub Actions (se schema ovan)
 - `https://www.elprisetjustnu.se/api/v1/prices/ÅÅÅÅ/MM-DD_SE3.json` – spotpris per kvart, exkl. moms.
   Kortet visar inkl. 25 % moms (utan nätavgift och elhandlarens påslag), timmedel i diagrammet,
   priset just nu och billigaste 3 timmar i följd framåt. Morgondagen (404 innan ca 13:00) får egen flik.
-- Elområdet väljs i kortet och sparas i webbläsaren (förvalt SE3).
+- Elområdet väljs med knapparna eller i den lilla kartan och sparas i webbläsaren (förvalt SE3).
+  Kartan (`ELKARTA` i [index.html](index.html)) är schematisk: Natural Earths län (public domain), förenklade och
+  sammanslagna till elområden – SE1 Norrbotten; SE2 Västerbotten, Jämtland, Västernorrland, Gävleborg;
+  SE4 Skåne, Blekinge, Kronoberg; resten SE3. De verkliga gränserna följer inte länen exakt.
 
 ### SL-avgångar
 - `https://transport.integration.sl.se/v1/sites/<id>/departures?forecast=60` – realtid, öppen CORS, ingen nyckel.
