@@ -123,6 +123,8 @@
   .kalla .tid:not(:empty)::before { content: " · "; }
   .kalla .tid.forsenad { color: var(--accent); font-weight: 600; }
   .fel { color: var(--accent); }
+  .forsok-igen { font: inherit; font-size: 13px; margin-top: 8px; padding: 3px 12px; border-radius: 999px; border: 1px solid var(--accent); background: none; color: var(--accent); cursor: pointer; }
+  .forsok-igen:hover { background: var(--markering); }
 
   /* Väder */
   .nu { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
@@ -468,18 +470,6 @@
       <div id="priser-innehall">Hämtar priser…</div>
       <div class="kalla">Källa: <a href="https://www.scb.se/hitta-statistik/statistik-efter-amne/priser-och-konsumtion/konsumentprisindex/konsumentprisindex-kpi/">SCB, KPI per varugrupp</a> · <span id="priser-manad"></span></div>
     </section>
-
-    <section class="kort" id="systembolaget">
-      <h2>Släpp · Systembolaget</h2>
-      <div id="systembolaget-innehall">Hämtar släpp…</div>
-      <div class="kalla">Källa: <a href="https://www.systembolaget.se/">Systembolaget</a> (inofficiellt) · säljstart kl 10<span class="tid" id="systembolaget-tid"></span></div>
-    </section>
-
-    <section class="kort" id="sport">
-      <h2>Sport</h2>
-      <div id="sport-innehall">Hämtar matcher…</div>
-      <div class="kalla">Källor: ESPN (fotboll, NHL), <a href="https://www.shl.se/">shl.se</a> (SHL) – inofficiella<span class="tid" id="sport-tid"></span></div>
-    </section>
     </div>
 
     <div class="kolumn hoger">
@@ -505,6 +495,18 @@
       <h2>Evenemang · Stockholm</h2>
       <div id="evenemang-innehall">Hämtar evenemang…</div>
       <div class="kalla">Källa: <a href="https://www.visitstockholm.se/evenemang/">Visit Stockholm</a>, Stockholm Business Region (<a href="https://creativecommons.org/licenses/by/4.0/deed.sv">CC BY 4.0</a>) · urval<span class="tid" id="evenemang-tid"></span></div>
+    </section>
+
+    <section class="kort" id="systembolaget">
+      <h2>Släpp · Systembolaget</h2>
+      <div id="systembolaget-innehall">Hämtar släpp…</div>
+      <div class="kalla">Källa: <a href="https://www.systembolaget.se/">Systembolaget</a> (inofficiellt) · säljstart kl 10<span class="tid" id="systembolaget-tid"></span></div>
+    </section>
+
+    <section class="kort" id="sport">
+      <h2>Sport</h2>
+      <div id="sport-innehall">Hämtar matcher…</div>
+      <div class="kalla">Källor: ESPN (fotboll, NHL), <a href="https://www.shl.se/">shl.se</a> (SHL) – inofficiella<span class="tid" id="sport-tid"></span></div>
     </section>
 
     <section class="kort" id="verktyg">
@@ -698,6 +700,16 @@ function symbol(kod, timme) {
   return [vaderikon(kod, timme < 6 || timme >= 20), text];
 }
 
+// Fel i ett kort: vad som saknas på vanlig svenska, det tekniska i title,
+// och en knapp som försöker igen direkt i stället för att vänta på nästa uppdatering.
+function felHtml(vad, e) {
+  return `<div class="fel" title="${esc(e?.message ?? e)}">Kunde inte hämta ${esc(vad)} just nu.</div>`;
+}
+function visaFel(ruta, vad, e, forsokIgen) {
+  ruta.innerHTML = `${felHtml(vad, e)}<button type="button" class="forsok-igen">Försök igen</button>`;
+  ruta.querySelector(".forsok-igen").onclick = () => { ruta.innerHTML = `<div class="info">Hämtar…</div>`; forsokIgen(); };
+}
+
 // Diskret "senast hämtad" i källraden på varje kort.
 const senaste = rader => rader.map(r => r.hamtad).filter(Boolean).sort().at(-1);
 function visaTid(id, iso, prefix = "", takt = null) {
@@ -777,7 +789,7 @@ async function visaVader() {
       ${diagram(timmar.slice(0, TIMMAR_I_DIAGRAM))}
       ${dagsoversikt(timmar)}`;
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta vädret (${esc(e.message)}).</span>`;
+    visaFel(ruta, "vädret", e, visaVader);
   }
 }
 
@@ -950,7 +962,7 @@ async function visaLunch() {
     };
     rita();
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta lunchmenyer (${esc(e.message)}).</span>`;
+    visaFel(ruta, "lunchmenyerna", e, visaLunch);
   }
 }
 
@@ -1031,7 +1043,7 @@ async function visaNyheter() {
     };
     rita();
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta nyheter (${esc(e.message)}).</span>`;
+    visaFel(ruta, "nyheterna", e, visaNyheter);
   }
 }
 
@@ -1091,7 +1103,7 @@ async function visaSL() {
       .filter(a => (a.expected || a.scheduled) >= nu)
       .map(a => ({ ...a, display: (a.expected || a.scheduled).slice(11, 16) })) };
     const innehall = r.status === "rejected"
-      ? `<span class="fel">Kunde inte hämta avgångar (${esc(r.reason.message)}).</span>`
+      ? felHtml("avgångarna", r.reason)
       : r.value.avgangar.length ? r.value.avgangar.map(avgangsrad).join("") : `<div class="info">Inga avgångar närmaste timmen.</div>`;
     return `<div class="hallplats"><div class="rubrik">${esc(h.namn)}</div>${innehall}</div>`;
   }).join("");
@@ -1234,7 +1246,7 @@ async function visaElpris() {
       document.getElementById("elpris-rubrik").textContent = `Elpris · ${omrade}`;
       visaTid("elpris-tid", new Date().toISOString());
     } catch (e) {
-      ruta.innerHTML = `<span class="fel">Kunde inte hämta elpriset (${esc(e.message)}).</span>`;
+      visaFel(ruta, "elpriset", e, visaElpris);
     }
   }
   await rita();
@@ -1489,7 +1501,7 @@ async function visaPriser(steg = 0) {
     svg.addEventListener("pointermove", e => visaManad(e.clientX));
     svg.addEventListener("pointerleave", () => { sikte.setAttribute("visibility", "hidden"); avlas.textContent = ""; });
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta priser från SCB (${esc(e.message)}).</span>`;
+    visaFel(ruta, "priserna från SCB", e, () => visaPriser(steg));
   }
 }
 
@@ -1628,7 +1640,7 @@ async function ritaTabell(nyckel) {
         ${g.rader.map(r => `<tr><td>${r.plats}</td><td class="lagkol">${esc(r.lag)}</td><td>${r.matcher ?? ""}</td><td>${r.diff != null ? diff(r.diff) : ""}</td><td class="poang">${r.poang ?? ""}</td></tr>`).join("")}
       </tbody>`).join("")}</table>`;
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta tabellen (${esc(e.message)}).</span>`;
+    visaFel(ruta, "tabellen", e, () => ritaTabell(nyckel));
   }
 }
 
@@ -1687,9 +1699,9 @@ async function visaSport() {
         <div class="flikar sportfilter">${SPORTLIGOR.map(([k, n]) => `<button type="button" data-liga="${k}" aria-pressed="${valda.has(k)}">${esc(n)}</button>`).join("")}</div>
       </details>
       <div class="sportdag">Idag</div>
-      ${idagHtml || `<div class="info">Inga matcher idag i de valda ligorna.</div>`}
+      ${idagHtml || (fel.length ? "" : `<div class="info">Inga matcher idag i de valda ligorna.</div>`)}
       ${antalIgar ? `<details class="hela"><summary>Igår (${antalIgar} ${antalIgar === 1 ? "match" : "matcher"})</summary>${igarHtml}</details>` : ""}
-      ${fel.length ? `<div class="info">Kunde inte hämta allt (${esc(fel.join(", "))}).</div>` : ""}
+      ${fel.length ? `<div class="info" title="${esc(fel.join(", "))}">Vissa matcher saknas – källan svarar inte just nu.</div>` : ""}
       ${tabellsektion(valda)}`;
     kopplaTabell(ruta);
     ruta.querySelector(".ligval").ontoggle = e => { ligvalOppet = e.target.open; };
@@ -1769,7 +1781,7 @@ async function visaEvenemang() {
     };
     rita();
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta evenemang (${esc(e.message)}).</span>`;
+    visaFel(ruta, "evenemangen", e, visaEvenemang);
   }
 }
 
@@ -1821,7 +1833,7 @@ async function visaTrender() {
     };
     rita();
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta trender (${esc(e.message)}).</span>`;
+    visaFel(ruta, "trenderna", e, visaTrender);
   }
 }
 
@@ -1870,7 +1882,7 @@ async function visaPolymarket() {
       </div>`).join("") || `<div class="info">Inga marknader just nu.</div>`;
     visaTid("polymarket-tid", new Date().toISOString());
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta Polymarket (${esc(e.message)}).</span>`;
+    visaFel(ruta, "Polymarket", e, visaPolymarket);
   }
 }
 
@@ -1934,7 +1946,7 @@ async function visaSystembolaget() {
     ruta.innerHTML = rader.slice(0, SYNLIGA_SLAPP).join("")
       + (fler.length ? `<details class="hela fler-slapp"><summary>Fler släpp (${fler.length})</summary>${fler.join("")}</details>` : "");
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta släpp (${esc(e.message)}).</span>`;
+    visaFel(ruta, "släppen", e, visaSystembolaget);
   }
 }
 
@@ -2100,7 +2112,7 @@ async function visaStyrranta() {
         </details>` : ""}`;
     visaTid("styrranta-tid", rad.hamtad, "", "ofta");
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta styrräntan (${esc(e.message)}).</span>`;
+    visaFel(ruta, "styrräntan", e, visaStyrranta);
   }
 }
 
@@ -2201,7 +2213,7 @@ function startaLon() {
       rakna();
     } catch (e) {
       laddad = false;
-      ut.innerHTML = `<span class="fel">Kunde inte hämta skattesatser (${esc(e.message)}).</span>`;
+      visaFel(ut, "skattesatserna", e, ladda);
     }
   }
 
@@ -2240,7 +2252,7 @@ function startaLon() {
     ut.innerHTML = `<div class="info">Räknar…</div>`;
     let tabell;
     try { tabell = await hamtaSkattetabell(skattesatser.ar, nr); }
-    catch (e) { ut.innerHTML = `<span class="fel">Kunde inte hämta skattetabell ${nr} (${esc(e.message)}).</span>`; return; }
+    catch (e) { visaFel(ut, `skattetabell ${nr}`, e, rakna); return; }
     if (anrop !== senaste) return;      // en nyare uträkning har startat
 
     const skatt = tabellskatt(tabell, brutto, kolumn);
@@ -2326,7 +2338,7 @@ function startaInflation() {
       rakna();
     } catch (e) {
       laddad = false;
-      ut.innerHTML = `<span class="fel">Kunde inte hämta KPI från SCB (${esc(e.message)}).</span>`;
+      visaFel(ut, "KPI från SCB", e, ladda);
     }
   }
 
@@ -2427,7 +2439,7 @@ async function visaBors() {
         </div>`;
     }).join("");
   } catch (e) {
-    ruta.innerHTML = `<span class="fel">Kunde inte hämta kurser (${esc(e.message)}).</span>`;
+    visaFel(ruta, "kurserna", e, visaBors);
   }
 }
 
