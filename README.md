@@ -17,6 +17,7 @@ Live: https://janne89.github.io/morgonkoll/
 | Dagens prisjämförelse (en vara per dag mot KPI) | [SCB](https://www.scb.se/) KPI per varugrupp | I webbläsaren | När sidan öppnas (SCB publicerar en gång i månaden) |
 | Sport: Sverigematcher, Allsvenskan, Superettan, PL, CL, EL, Ligue 1, Serie A, La Liga, Bundesliga, NHL | ESPN (inofficiellt API) | I webbläsaren | När sidan öppnas, var 15:e min, varannan minut under pågående matcher |
 | Sport: SHL | shl.se (inofficiellt API) | GitHub Actions → Supabase | Med nyheterna, var 15:e min (även helger) |
+| Evenemang i Stockholm: stora (med antal besökare) och idag/imorgon/helgen | [Visit Stockholm Open API](https://api.visitstockholm.com/documentation/) (CC BY 4.0) | GitHub Actions → Supabase | Morgnar, vardag och helg |
 | Namnsdag, helg- och flaggdag | [Svenska dagar-API](https://sholiday.faboul.se/) | I webbläsaren | Varje gång sidan öppnas |
 | Temadagar (kanelbullens dag m.m.) | Egen lista i `index.html` | I webbläsaren | – (fasta datum + uträknade rörliga) |
 | Börs: OMXS30, S&P 500, Nasdaq, DAX, olja (Brent), guld, bitcoin | Yahoo Finance (inofficiellt API) | GitHub Actions → Supabase | Var 15:e min vardagar ca 06–22, varje timme helger (för bitcoin) |
@@ -40,14 +41,15 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 
 | Cron (UTC) | Svensk tid (ca) | Kör |
 |---|---|---|
-| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget) |
+| `17 5-8 * * 1-5` | vardagar 06:17–09:17 vinter / 07:17–10:17 sommar, varje timme | allt (lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget, evenemang) |
 | `*/15 4-20 * * 1-5` | vardagar 05:00–21:45 vinter / 06:00–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
 | `*/15 6-20 * * 0,6` | helger 07–21:45 vinter / 08–22:45 sommar, var 15:e min | nyheter + börs + trender + Riksbanken + SHL |
+| `37 5 * * 0,6` | helgmorgnar 06:37 vinter / 07:37 sommar | allt (för evenemang m.m.) |
 | manuellt (Run workflow) | – | allt |
 
 - GitHub fördröjer ofta schemalagda körningar 5–15 min och hoppar ibland över någon.
 - Två körningar körs aldrig samtidigt (`concurrency`).
-- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken] [shl]` – utan argument körs allt.
+- Lokalt: `python fetch/main.py [lunch] [nyheter] [bors] [systembolaget] [trender] [riksbanken] [shl] [evenemang]` – utan argument körs allt.
   Utan `SUPABASE_URL`/`SUPABASE_SECRET_KEY` blir det en torrkörning som bara skriver ut resultatet.
 - Varje körning raderar data äldre än 7 dagar (för att hålla sig inom Supabase gratisnivå).
 
@@ -56,7 +58,7 @@ av ett Python-jobb i GitHub Actions och sparas i Supabase, som sidan läser frå
 ```
 GitHub Pages (index.html)
    ├─ Väder (SMHI), elpris, SL-avgångar, namnsdag (Svenska dagar) och verktygens data: direkt i webbläsaren
-   └─ Lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget: läses från Supabase (publik nyckel + RLS, bara läsning)
+   └─ Lunch, nyheter, börs, trender, Riksbanken, SHL, Systembolaget, evenemang: läses från Supabase (publik nyckel + RLS, bara läsning)
                 ↑
 GitHub Actions (se schema ovan)
    └─ fetch/ (Python): hämtar källorna och skriver till Supabase med hemlig nyckel
@@ -87,6 +89,15 @@ GitHub Actions (se schema ovan)
 ### Soltider
 - Räknas i webbläsaren för Stockholm (59,33 N, 18,07 E) med SunCalc-algoritmen; visas i sidhuvudet med dagslängd
   och skillnad mot i går.
+
+### Evenemang i Stockholm
+- Visit Stockholms öppna API (`api.visitstockholm.com/api/v1/`, CC BY 4.0 – Stockholm Business Region ska anges):
+  - `forecast-events/` – stora evenemang med förväntat antal besökare (arenakonserter, festivaler, lopp). De närmaste
+    60 dagarna sparas, kortet visar de 4 första.
+  - `singulareventdates/?date_from=…&date_to=…&page=…` – evenemang den närmaste veckan (16 per sida). Bara de som är
+    högst 3 dagar långa sparas, annars drunknar resten i långa utställningar. Kategorierna översätts i kortet.
+- [fetch/sources/evenemang.py](fetch/sources/evenemang.py) → tabellen `evenemang`, ersätts helt vid varje hämtning.
+  Kortet har flikarna Idag, Imorgon och I helgen; 8 visas, resten under "Visa n till".
 
 ### Sport
 - **Fotboll och NHL** från ESPN:s inofficiella API (`site.api.espn.com/apis/site/v2/sports/...`, ingen nyckel, CORS

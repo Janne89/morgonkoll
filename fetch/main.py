@@ -1,7 +1,7 @@
 """Hämtar källorna och skriver till Supabase.
 
     python main.py                 # allt
-    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender, riksbanken, shl)
+    python main.py nyheter bors    # bara vissa delar (lunch, nyheter, bors, systembolaget, trender, riksbanken, shl, evenemang)
 
 Utan SUPABASE_URL/SUPABASE_SECRET_KEY blir det en torrkörning som bara skriver
 ut vad som hämtades.
@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date
 
 from db import Databas
-from sources import bors, lunch_battre, nyheter, riksbanken, shl, systembolaget, trender
+from sources import bors, evenemang, lunch_battre, nyheter, riksbanken, shl, systembolaget, trender
 
 LUNCHKALLOR = [lunch_battre]
 
@@ -114,8 +114,20 @@ def shlmatcher(db):
         db.ersatt_alla("shl_tabell", tabell, "plats")
 
 
-DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata,
-         "systembolaget": slapp, "trender": googletrender, "riksbanken": styrranta, "shl": shlmatcher}
+def stockholmsevenemang(db):
+    rader = evenemang.hamta()
+    stora = [r for r in rader if r["stort"]]
+    print(f"Evenemang: {len(stora)} stora, {len(rader) - len(stora)} kortare")
+    for r in stora[:5]:
+        print(f"  {r['start']} {r['titel']} – {r['plats']} ({r['besokare']} besökare)")
+    if not rader:
+        raise RuntimeError("Evenemang: inga alls – har API:et ändrats?")
+    if db:
+        db.ersatt_alla("evenemang", rader, "id")
+
+
+DELAR = {"lunch": lunch, "nyheter": nyhetsrubriker, "bors": borsdata, "systembolaget": slapp,
+         "trender": googletrender, "riksbanken": styrranta, "shl": shlmatcher, "evenemang": stockholmsevenemang}
 
 
 def main(namn):

@@ -59,7 +59,7 @@
   .rutnat { display: flex; flex-direction: column; gap: 16px; }
   .kolumn { display: contents; }
   /* Mobil: kompakta kort först, lunchen sist. */
-  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #systembolaget { order: 9; } #sport { order: 10; } #verktyg { order: 11; }
+  #vader { order: 1; } #elpris { order: 2; } #bors { order: 3; } #nyheter { order: 4; } #trender { order: 5; } #priser { order: 6; } #sl { order: 7; } #lunch { order: 8; } #evenemang { order: 9; } #systembolaget { order: 10; } #sport { order: 11; } #verktyg { order: 12; }
   section.kort { scroll-margin-top: 56px; }
 
   /* Snabbmeny – bara på mobil. */
@@ -301,6 +301,19 @@
   .tabell .poang { font-weight: 600; }
   .tabell .grupp th { text-align: left; padding-top: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
 
+  /* Evenemang */
+  .stortevenemang { padding: 5px 0; border-bottom: 1px solid var(--linje); }
+  .stortevenemang:last-of-type { border-bottom: 0; }
+  .evtitel { font-weight: 600; }
+  .evtitel, .evenemangtitel { overflow-wrap: anywhere; }
+  #evenemang .evenemangsflikar { margin: 12px 0 4px; }
+  .evenemang { padding: 5px 0; border-bottom: 1px solid var(--linje); }
+  .evenemang:last-child { border-bottom: 0; }
+  .evenemangtitel a, .evtitel a { color: inherit; text-decoration: none; }
+  .evenemangtitel a:hover, .evtitel a:hover { text-decoration: underline; }
+  .evenemangmeta { font-size: 13px; color: var(--dampad); }
+  #evenemang .rubrik { margin-top: 0; }
+
   /* Systembolaget */
   .slapp { padding: 8px 0; border-bottom: 1px solid var(--linje); }
   .slapp:last-of-type { border-bottom: 0; }
@@ -337,6 +350,7 @@
     <a href="#trender">Trender</a>
     <a href="#sl">SL</a>
     <a href="#lunch">Lunch</a>
+    <a href="#evenemang">Evenemang</a>
     <a href="#systembolaget">Systembolaget</a>
     <a href="#sport">Sport</a>
   </nav>
@@ -404,6 +418,12 @@
       <div id="sl-innehall">Hämtar avgångar…</div>
       <div id="sl-storningar"></div>
       <div class="kalla">Källa: <a href="https://www.trafiklab.se/api/our-apis/sl/transport/">SL Transport API</a> (realtid)<span class="tid" id="sl-tid"></span></div>
+    </section>
+
+    <section class="kort" id="evenemang">
+      <h2>Evenemang · Stockholm</h2>
+      <div id="evenemang-innehall">Hämtar evenemang…</div>
+      <div class="kalla">Källa: <a href="https://www.visitstockholm.se/evenemang/">Visit Stockholm</a>, Stockholm Business Region (<a href="https://creativecommons.org/licenses/by/4.0/deed.sv">CC BY 4.0</a>) · urval<span class="tid" id="evenemang-tid"></span></div>
     </section>
 
     <section class="kort" id="verktyg">
@@ -1476,6 +1496,73 @@ async function visaSport() {
   }
 }
 
+// --- Evenemang i Stockholm ---
+
+const EVENEMANGSKATEGORIER = {
+  "Music": "Musik", "Stage & Film": "Scen & film", "Fairs": "Mässor", "Eat & Drink": "Mat & dryck",
+  "Family": "Familj", "Guided tours & Lectures": "Visningar & föreläsningar", "Networking & Community": "Nätverk",
+  "Exhibitions": "Utställningar", "Clubs & Parties": "Klubb & fest", "Festivals": "Festivaler",
+  "Sports & Wellbeing": "Sport & hälsa", "Science & Tech": "Vetenskap & teknik", "Careers & Leadership": "Karriär",
+};
+const ANTAL_STORA = 4, ANTAL_EVENEMANG = 8;
+
+// Dagarna för flikarna: idag, imorgon och kommande helg (lör–sön, eller resten av helgen om det redan är helg).
+function evenemangsdagar() {
+  const dag = n => lokal(new Date(Date.now() + n * 864e5)).datum;
+  const veckodag = new Date(`${dag(0)}T12:00:00`).getDay();       // 0 = söndag
+  const tillLordag = veckodag === 0 ? 0 : 6 - veckodag;
+  const helg = veckodag === 0 ? [dag(0)] : veckodag === 6 ? [dag(0), dag(1)] : [dag(tillLordag), dag(tillLordag + 1)];
+  return { idag: [dag(0)], imorgon: [dag(1)], helgen: helg };
+}
+
+async function visaEvenemang() {
+  const ruta = document.getElementById("evenemang-innehall");
+  try {
+    const idag = lokal(new Date()).datum;
+    const rader = await supabase("evenemang", `select=*&slut=gte.${idag}&order=start`);
+    visaTid("evenemang-tid", senaste(rader));
+    const stora = rader.filter(r => r.stort).slice(0, ANTAL_STORA);
+    const korta = rader.filter(r => !r.stort);
+    const dagar = evenemangsdagar();
+    let flik = "idag";
+    try { flik = localStorage.getItem("evenemangsflik") || "idag"; } catch {}
+    if (!dagar[flik]) flik = "idag";
+
+    const evenemangsrad = r => {
+      const titel = r.lank ? `<a href="${esc(r.lank)}" target="_blank" rel="noopener">${esc(r.titel)}</a>` : esc(r.titel);
+      const kategori = EVENEMANGSKATEGORIER[r.kategori] || r.kategori || "";
+      return `<div class="evenemang"><div class="evenemangtitel">${titel}</div>
+        <div class="evenemangmeta">${[kategori, r.plats].filter(Boolean).map(esc).join(" · ")}</div></div>`;
+    };
+
+    const rita = () => {
+      const valda = dagar[flik];
+      // Ett evenemang hör till dagen om det pågår då (start ≤ dag ≤ slut).
+      const lista = korta.filter(r => valda.some(d => r.start <= d && d <= r.slut));
+      const forsta = lista.slice(0, ANTAL_EVENEMANG), resten = lista.slice(ANTAL_EVENEMANG);
+      ruta.innerHTML = `
+        ${stora.length ? `<div class="rubrik">Stora evenemang</div>
+          ${stora.map(r => `<div class="stortevenemang">
+            <div class="evtitel">${r.lank ? `<a href="${esc(r.lank)}" target="_blank" rel="noopener">${esc(r.titel)}</a>` : esc(r.titel)}</div>
+            <div class="evenemangmeta">${[kortDatum(r.start), r.plats, r.besokare && `${tal(r.besokare, 0)} besökare`].filter(Boolean).map(esc).join(" · ")}</div>
+          </div>`).join("")}` : ""}
+        <div class="flikar evenemangsflikar">
+          ${[["idag", "Idag"], ["imorgon", "Imorgon"], ["helgen", "I helgen"]].map(([k, t]) => `<button type="button" data-flik="${k}" aria-pressed="${k === flik}">${t}</button>`).join("")}
+        </div>
+        ${forsta.length ? forsta.map(evenemangsrad).join("") : `<div class="info">Inga evenemang hittade.</div>`}
+        ${resten.length ? `<details class="hela"><summary>Visa ${resten.length} till</summary>${resten.map(evenemangsrad).join("")}</details>` : ""}`;
+      ruta.querySelectorAll("[data-flik]").forEach(b => b.onclick = () => {
+        flik = b.dataset.flik;
+        try { localStorage.setItem("evenemangsflik", flik); } catch {}
+        rita();
+      });
+    };
+    rita();
+  } catch (e) {
+    ruta.innerHTML = `<span class="fel">Kunde inte hämta evenemang (${esc(e.message)}).</span>`;
+  }
+}
+
 // --- Google Trends ---
 
 const ANTAL_TRENDER = 10;
@@ -2137,6 +2224,7 @@ visaVarningar();
 visaElpris();
 visaSL();
 visaLunch();
+visaEvenemang();
 visaNyheter();
 visaTrender();
 visaPriser();

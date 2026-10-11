@@ -122,6 +122,20 @@ create table if not exists shl_tabell (
   hamtad    timestamptz not null default now()
 );
 
+-- Evenemang i Stockholm (Visit Stockholm): stora med förväntat antal besökare och kortare den närmaste veckan.
+create table if not exists evenemang (
+  id        text primary key,
+  titel     text not null,
+  start     date not null,
+  slut      date not null,
+  plats     text,
+  kategori  text,
+  lank      text,
+  besokare  int,
+  stort     boolean not null default false,
+  hamtad    timestamptz not null default now()
+);
+
 -- RLS: alla (anon) får läsa, ingen får skriva. Hämtningen använder den hemliga
 -- nyckeln (service_role) som går förbi RLS.
 alter table lunch      enable row level security;
@@ -133,6 +147,7 @@ alter table trender    enable row level security;
 alter table riksbanken enable row level security;
 alter table shl        enable row level security;
 alter table shl_tabell enable row level security;
+alter table evenemang  enable row level security;
 
 drop policy if exists "alla får läsa" on lunch;
 drop policy if exists "alla får läsa" on lunch_info;
@@ -143,6 +158,7 @@ drop policy if exists "alla får läsa" on trender;
 drop policy if exists "alla får läsa" on riksbanken;
 drop policy if exists "alla får läsa" on shl;
 drop policy if exists "alla får läsa" on shl_tabell;
+drop policy if exists "alla får läsa" on evenemang;
 create policy "alla får läsa" on lunch      for select to anon, authenticated using (true);
 create policy "alla får läsa" on lunch_info for select to anon, authenticated using (true);
 create policy "alla får läsa" on nyheter    for select to anon, authenticated using (true);
@@ -152,6 +168,7 @@ create policy "alla får läsa" on trender    for select to anon, authenticated 
 create policy "alla får läsa" on riksbanken for select to anon, authenticated using (true);
 create policy "alla får läsa" on shl        for select to anon, authenticated using (true);
 create policy "alla får läsa" on shl_tabell for select to anon, authenticated using (true);
+create policy "alla får läsa" on evenemang  for select to anon, authenticated using (true);
 
-grant select on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell to anon, authenticated;
-grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell to service_role;
+grant select on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell, evenemang to anon, authenticated;
+grant select, insert, update, delete on lunch, lunch_info, nyheter, bors, systembolaget, trender, riksbanken, shl, shl_tabell, evenemang to service_role;

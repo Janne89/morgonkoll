@@ -9,6 +9,8 @@ on:
     - cron: "*/15 4-20 * * 1-5"
     # Samma på helger (bitcoin och SHL), var 15:e minut ungefär 07–22 svensk tid.
     - cron: "*/15 6-20 * * 0,6"
+    # Allt en gång på helgmorgnar (evenemang, Systembolaget m.m. – lunchen finns inte på helger men skadar inte).
+    - cron: "37 5 * * 0,6"
   workflow_dispatch:
 
 # Kör aldrig två hämtningar samtidigt.
