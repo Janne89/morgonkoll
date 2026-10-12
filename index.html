@@ -1840,7 +1840,8 @@ async function visaTrender() {
 // --- Polymarket ---
 
 // Gamma API (öppet, CORS tillåtet): händelser sorterade på handelsvolym senaste veckan.
-const POLYMARKET = "https://gamma-api.polymarket.com/events?order=volume1wk&ascending=false&limit=15&active=true&closed=false";
+// /events är utfasad (sunset 2026-05-01), keyset-varianten svarar { events: [...], next_cursor }.
+const POLYMARKET = "https://gamma-api.polymarket.com/events/keyset?order=volume1wk&ascending=false&limit=15&active=true&closed=false";
 const ANTAL_POLYMARKET = 5;
 const UTFALL = { Yes: "Ja", No: "Nej" };
 
@@ -1870,7 +1871,7 @@ async function visaPolymarket() {
   try {
     const svar = await fetch(POLYMARKET);
     if (!svar.ok) throw new Error(`Polymarket svarade ${svar.status}`);
-    const handelser = (await svar.json())
+    const handelser = ((await svar.json()).events || [])
       .map(e => ({ ...e, ledare: polyLedare(e) }))
       .filter(e => e.ledare)
       .slice(0, ANTAL_POLYMARKET);

@@ -236,7 +236,7 @@ GitHub Actions (startas av Supabase pg_cron, se schema ovan)
 - Tabellen `trender` har nyckeln (region, sokord); varje region ersätts för sig, så ett fel i en region rör inte de andra.
 
 ### Polymarket
-- `https://gamma-api.polymarket.com/events?order=volume1wk&ascending=false&active=true&closed=false` – öppet, CORS
+- `https://gamma-api.polymarket.com/events/keyset?order=volume1wk&ascending=false&active=true&closed=false` – öppet, CORS (gamla `/events` är utfasad)
   tillåtet. Kortet visar de 5 händelserna med störst handelsvolym senaste veckan och ledande utfall (marknadens pris
   som sannolikhet). Rubrikerna är på engelska.
 
